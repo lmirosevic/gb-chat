@@ -15,18 +15,19 @@ var thrift = require('thrift');
 // var myErr = new ttypes.RequestError({type: ttypes.ErrorType.GENERIC, description: "magic"});
 // console.log(myErr);
 
-//Config
+// Config
 nconf.argv()
      .env()
      .file({file: './config/defaults.json'});
 
-//Server implementation
+// Server implementation
+var persistence = require('./persistence/' + nconf.get('PERSISTENCE').type);
 var server = thrift.createServer(ChatService, {  
   alive: function(result) {
     result(null, '777');
   },
   isUsernameAvailable: function(username, result) {
-    var isUsernameAvailable;
+    var isUsernameAvailable = persistence.userExists(username);
 
     result(null, isUsernameAvailable);
   },
@@ -66,6 +67,23 @@ var server = thrift.createServer(ChatService, {
   },
 });
 
-//Start server
+// Start server
 server.listen(nconf.get('PORT'));
 console.log("Server started on port " + nconf.get('PORT'));
+
+/*
+gonna need:
+
+database:
+list of usernames
+list of chats
+list of messages
+
+function:
+way to generate unique userid
+
+pluggable back end:
+in-memory
+redis
+
+*/

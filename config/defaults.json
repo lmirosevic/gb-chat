@@ -1,3 +1,7 @@
 {
-	"PORT": 56475
+	"PORT": 56475,
+	"PERSISTENCE": {
+		"type": "InMemory",
+		"options": {}
+	}
 }
