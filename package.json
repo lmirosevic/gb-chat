@@ -9,7 +9,8 @@
 		"url": "http://github.com/lmirosevic/GBChat-service.git"
 	},
 	"dependencies": {
-		"node-thrift": "1.0.x"
+		"thrift": "0.9.x",
+		"nconf": "0.6.x"
 	},
 	"engines": {
 		"node": "0.10.x",

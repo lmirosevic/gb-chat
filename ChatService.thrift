@@ -75,7 +75,7 @@ service ChatService extends GoonbeeSharedService.BaseService {
 	bool				isUsernameAvailable		(1: string username)												throws(1: RequestError error),
 
 	/**
-	 * Register a username, or change it if you are already registered. pass null or empty string to userId if not registered
+	 * Register a username, or change it if you are already registered. pass null or empty string to userId if not registered, returns userId on success
 	 */
 	string 				registerUsername		(1: string userId, 2: string username)								throws(1: RequestError error),
 
