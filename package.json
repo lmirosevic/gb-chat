@@ -4,6 +4,7 @@
 	"author" : "Luka Mirosevic <luka@goonbee.com>",
 	"version": "1.0.0",
 	"private": false,
+	"main": "app.js",
 	"repository": {
 		"type": "git",
 		"url": "http://github.com/lmirosevic/GBChat-service.git"
