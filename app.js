@@ -22,6 +22,10 @@ nconf.argv()
 
 // Server implementation
 var persistence = require('./persistence/' + nconf.get('PERSISTENCE').type);
+persistence.setHashingFunction(function(input) {
+  return nconf.get('HASHING_SALT') + input.toString();//lm add some hashing on top of this
+});
+
 var server = thrift.createServer(ChatService, {  
   alive: function(result) {
     result(null, '777');

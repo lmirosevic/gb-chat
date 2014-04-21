@@ -3,5 +3,6 @@
 	"PERSISTENCE": {
 		"type": "InMemory",
 		"options": {}
-	}
+	},
+	"HASHING_SALT": "magic"
 }
