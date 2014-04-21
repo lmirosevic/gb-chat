@@ -16,16 +16,10 @@ namespace go GBChatService
 namespace cocoa GBChatService
 
 
-enum RangeSorting {
-	ASCENDING = 0,
-	DESCENDING,
-}
-
 enum ChatSorting {
 	PARTICIPANTS = 0,
-	MESSAGECOUNT,
-	MESSAGEVELOCITY,
-	DATECREATED,
+	MESSAGE_COUNT,
+	DATE_CREATED,
 }
 
 enum ErrorType {
@@ -33,9 +27,8 @@ enum ErrorType {
 }
 
 struct Range {
-	1: RangeSorting sorting = RangeSorting.DESCENDING,
-	2: i32 index,
-	3: i32 length,
+	1: i32 index,
+	2: i32 length,
 }
 
 struct ChatStats {
@@ -165,14 +158,8 @@ enum ChatSorting {
 }
 
 struct Range {
-	RangeSorting sorting
 	Int index
 	int length
-}
-
-enum RangeSorting {
-	forwards
-	reverse
 }
 
 */
