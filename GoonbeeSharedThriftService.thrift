@@ -1,20 +1,25 @@
 //
-//  GoonbeeSharedService.thrift
+//  GoonbeeSharedThriftService.thrift
 //  Goonbee Thrift Shared
 //
 //  Created by Luka Mirosevic on 17/04/2014.
 //  Copyright (c) 2014 Goonbee. All rights reserved.
 //
 
-namespace java goonbee.thirftSharedService
-namespace rb Goonbee.ThriftSharedService
-namespace js GBThriftSharedService
-namespace go GBThriftSharedService
-namespace cocoa GBThriftSharedService
+namespace java goonbee.sharedThriftService
+namespace rb Goonbee.sharedThriftService
+namespace js GBSharedThriftService
+namespace go GBSharedThriftService
+namespace cocoa GBSharedThriftService
 
 
 enum ErrorType {
 	GENERIC = 0,
+	SUCCESS = 1,
+	MALFORMED_REQUEST = 2,
+	AUTHENTICATION = 3,
+	AUTHORIZATION = 4,
+	PHASED_OUT = 5,
 }
 
 exception RequestError {

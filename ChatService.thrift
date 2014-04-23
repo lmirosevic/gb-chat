@@ -6,7 +6,7 @@
 //  Copyright (c) 2014 Goonbee. All rights reserved.
 //
 
-include "GoonbeeSharedService.thrift"
+include "GoonbeeSharedThriftService.thrift"
 
 
 namespace java goonbee.chatService
@@ -61,7 +61,7 @@ exception RequestError {
 }
 
 
-service ChatService extends GoonbeeSharedService.BaseService {
+service ChatService extends GoonbeeSharedThriftService.BaseService {
 	/**
 	 * Check whether the username is available or not
 	 */
