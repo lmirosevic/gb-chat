@@ -61,9 +61,7 @@ var server = thrift.createServer(ChatService, {
 
     result(null, messages);
   },
-  setChatMeta: function(chatId, chatMeta, result) {
-    result(null);
-  },
+  setChatMeta: this.newChat,
   globalUserCount: function(result) {
     var globalUserCount;
 

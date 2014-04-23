@@ -73,9 +73,9 @@ service ChatService extends GoonbeeSharedService.BaseService {
 	string 				registerUsername		(1: string userId, 2: string username)								throws(1: RequestError error),
 
 	/**
-	 * Create a new chat channel
+	 * Create a new chat channel. Chats are created lazily so this method is identical to `chat` with an added chatMeta parameter
 	 */
-	void 				newChat					(1: string userId, 2: ChatMeta chatMeta)							throws(1: RequestError error),
+	Chat 				newChat					(1: string userId, 2: string chatId, 3: ChatMeta chatMeta)			throws(1: RequestError error),
 
 	/**
 	 * Returns info on all available chat channels (e.g. how many messages, participators, date created, etc.)
@@ -85,7 +85,7 @@ service ChatService extends GoonbeeSharedService.BaseService {
 	/**
 	 * Returns info on a particular chat channel
 	 */
-	Chat 				chat 	 				(1: string chatId)													throws(1: RequestError error),
+	Chat 				chat 	 				(1: string userId, 2: string chatId)								throws(1: RequestError error),
 
 	/**
 	 * Post a new message on a certain chat channel
@@ -95,12 +95,12 @@ service ChatService extends GoonbeeSharedService.BaseService {
 	/**
 	 * Returns messags for a chat channel, according to range
 	 */
-	list<Message> 		messages				(1: string chatId, 2: Range range)									throws(1: RequestError error),
+	list<Message> 		messages				(1: string userId, 2: string chatId, 3: Range range)				throws(1: RequestError error),
 
 	/**
-	 * Update a chat's meta
+	 * Update a chat's meta. This is an alias for newChat, which creates chats lazily
 	 */
-	void 				setChatMeta				(1: string chatId, 2: ChatMeta chatMeta)							throws(1: RequestError error),
+	Chat 				setChatMeta				(1: string userId, 2: string chatId, 3: ChatMeta chatMeta)			throws(1: RequestError error),
 
 	/**
 	 * Get the total number of users registered with the chat service
