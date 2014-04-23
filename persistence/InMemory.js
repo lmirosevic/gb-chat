@@ -7,9 +7,9 @@
 //
 
 var _ = require('underscore');
-var GB = require('lib/Goonbee/toolbox');
+var GB = require('../lib/Goonbee/toolbox');
 
-var persistenceCommons = require('persistence/commons');
+var persistenceCommons = require('./commons');
 
 var storage = {
   users: {},

@@ -61,7 +61,7 @@ exception RequestError {
 }
 
 
-service ChatService extends GoonbeeSharedThriftService.BaseService {
+service GoonbeeChatService extends GoonbeeSharedThriftService.GoonbeeSharedThriftService {
 	/**
 	 * Check whether the username is available or not
 	 */

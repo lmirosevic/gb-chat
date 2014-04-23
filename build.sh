@@ -4,4 +4,4 @@
 rm -rf gen-*
 
 #generate latest
-thrift -r --gen js:node --gen cocoa ChatService.thrift
+thrift -r --gen js:node --gen cocoa GoonbeeChatService.thrift

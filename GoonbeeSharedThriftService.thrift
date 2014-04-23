@@ -28,7 +28,7 @@ exception RequestError {
 }
 
 
-service BaseService {
+service GoonbeeSharedThriftService {
 	/**
 	 * check whether the service is alive or not
 	 */

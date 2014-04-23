@@ -7,8 +7,8 @@
 //
 
 var thrift = require('thrift');
-    ChatService = require('./gen-nodejs/ChatService');
-    ttypes = require('./gen-nodejs/ChatService_types');
+    GBChatService = require('./gen-nodejs/GoonbeeChatService');
+    ttypes = require('./gen-nodejs/GoonbeeChatService_types');
     nconf = require('nconf');
 
 //just some testing
@@ -26,10 +26,19 @@ persistence.setHashingFunction(function(input) {
   return nconf.get('HASHING_SALT') + input.toString();//lm add some hashing on top of this
 });
 
-var server = thrift.createServer(ChatService, {  
+var server = thrift.createServer(GBChatService, {
+  /** 
+   * Goonbee Shared Thrift Service 
+   */
+
   alive: function(result) {
     result(null, '777');
   },
+
+  /** 
+   * Goonbee Chat Service 
+   */
+
   isUsernameAvailable: function(username, result) {
     var isUsernameAvailable = persistence.userExists(username);
 
