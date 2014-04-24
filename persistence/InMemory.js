@@ -7,15 +7,14 @@
 //
 
 var _ = require('underscore');
-var GB = require('../lib/Goonbee/toolbox');
-
-var persistenceCommons = require('./commons');
+    GB = require('../lib/Goonbee/toolbox');
+    persistenceCommons = require('./commons');
+    errors = require('../lib/Chat/errors');
 
 var storage = {
   users: {},
   chats: {}
 };
-
 var hashingFunction;
 
 var p = {
@@ -63,7 +62,7 @@ var p = {
     return chat;
   },
   verifyUser: function(userId) {
-    if (!inMemoryPersistence.userExists(userId)) throw new Error('The user "' + userId + '" does not exist');
+    if (!inMemoryPersistence.userExists(userId)) throw new errors.AuthenticationError('The user "' + userId + '" does not exist');
   },
   sliceForRange: function(collection, range) {
     var elementCount = _.count(collection);
@@ -77,164 +76,167 @@ var p = {
 };
 
 var inMemoryPersistence = module.exports = {
-  setHashingFunction: function(handler) {
-    GB.requiredArguments(handler);
+  commons: persistenceCommons,
+  api: {
+    setHashingFunction: function(handler) {
+      GB.requiredArguments(handler);
 
-    hashingFunction = handler;
-  },
-  userExists: function(username) {
-    GB.requiredArguments(username);
+      hashingFunction = handler;
+    },
+    userExists: function(username) {
+      GB.requiredArguments(username);
 
-    return !_.contains(storage.users, username);
-  },
-  setUser: function(userId, username) {
-    GB.requiredArguments(username);
-    GB.requiredVariables(hashingFunction);
-    p.verifyUser(userId);
-    
-    // lazy creation of userId (and therewith user)
-    if (_.isUndefined(userId)) userId = hashingFunction(_.count(storage.users));
+      return _.contains(storage.users, username);
+    },
+    setUser: function(userId, username) {
+      GB.requiredArguments(username);
+      GB.requiredVariables(hashingFunction);
+      p.verifyUser(userId);
+      
+      // lazy creation of userId (and therewith user)
+      if (_.isUndefined(userId)) userId = hashingFunction(_.count(storage.users));
 
-    storage.users[userId] = username;
+      storage.users[userId] = username;
 
-    return userId;//lm this one needs to be reflected in the thrift interface, i.e. this creates a new user if userId is not supplied
-  },
-  getUsername: function(userId) {
-    GB.requiredArguments(userId);
-    p.verifyUser(userId);
+      return userId;//lm this one needs to be reflected in the thrift interface, i.e. this creates a new user if userId is not supplied
+    },
+    getUsername: function(userId) {
+      GB.requiredArguments(userId);
+      p.verifyUser(userId);
 
-    return storage.users[userId];
-  },
-  getUserCount: function() {
-    return _.size(storage.users);
-  },
-  getChatStats: function(userId, chatId) {
-    GB.requiredArguments(userId, chatId);
-    p.verifyUser(userId);
-    var chat = p.lazyChat(chatId, {owner: userId});
+      return storage.users[userId];
+    },
+    getUserCount: function() {
+      return _.size(storage.users);
+    },
+    getChatStats: function(userId, chatId) {
+      GB.requiredArguments(userId, chatId);
+      p.verifyUser(userId);
+      var chat = p.lazyChat(chatId, {owner: userId});
 
-    var stats = {
-        messageCount: chat.messages.length,
-        participantCount: chat.participants.length,
-      };
+      var stats = {
+          messageCount: chat.messages.length,
+          participantCount: chat.participants.length,
+        };
 
-    return stats;
-  },
-  getChatMeta: function(userId, chatId) {
-    GB.requiredArguments(userId, chatId);
-    p.verifyUser(userId);
-    var chat = p.lazyChat(chatId, {owner: userId});
+      return stats;
+    },
+    getChatMeta: function(userId, chatId) {
+      GB.requiredArguments(userId, chatId);
+      p.verifyUser(userId);
+      var chat = p.lazyChat(chatId, {owner: userId});
 
-    var meta = {
-        owner: chat.meta.owner,
-        dateCreated: chat.meta.dateCreated,
-        name: chat.meta.name,
-        topic: chat.meta.topic,
-      };
-
-    return meta;
-  },
-  newChat: function(userId, chatId, options) {
-    GB.requiredArguments(userId, options);
-    p.verifyUser(userId);
-    var chat = p.lazyChat(chatId, {owner: userId});
-
-    // initialise meta
-    if (!_.isUndefined(options.owner)) chat.meta.owner = options.owner;
-    if (!_.isUndefined(options.dateCreated)) chat.meta.dateCreated = options.dateCreated;
-    if (!_.isUndefined(options.name)) chat.meta.name = options.name;
-    if (!_.isUndefined(options.topic)) chat.meta.topic = options.topic;
-
-    return chat;
-  },
-  setChatMeta: this.newChat,//the implementation is identical to newChat so it is implemented as an alias
-  getChat: function(userId, chatId) {
-    GB.requiredArguments(userId, chatId);
-    p.verifyUser(userId);
-    var chat = p.lazyChat(chatId, {owner: userId});
-
-    var chatObject = {
-      id: chat.id,
-      meta: this.getChatMeta(chatId),
-      stats: this.getChatStats(chatId)
-    };
-
-    return chatObject;
-  },
-  getChats: function(sorting, range) {
-    GB.requiredArguments(sorting, range);
-
-    // prune the raw chat first to get only what we want out, we do it now because the elements will be copied and this saves memory
-    var prunedChats = _.map(storage.chats, function(chat, key) {
-      var chatObject = {
-        id: key,
-        meta: {
+      var meta = {
           owner: chat.meta.owner,
           dateCreated: chat.meta.dateCreated,
           name: chat.meta.name,
           topic: chat.meta.topic,
-        },
-        stats: {
-          messageCount: chat.messages.length,
-          participantCount: chat.participants.length,
-        },
+        };
+
+      return meta;
+    },
+    newChat: function(userId, chatId, options) {
+      GB.requiredArguments(userId, options);
+      p.verifyUser(userId);
+      var chat = p.lazyChat(chatId, {owner: userId});
+
+      // initialise meta
+      if (!_.isUndefined(options.owner)) chat.meta.owner = options.owner;
+      if (!_.isUndefined(options.dateCreated)) chatlazy.meta.dateCreated = options.dateCreated;
+      if (!_.isUndefined(options.name)) chat.meta.name = options.name;
+      if (!_.isUndefined(options.topic)) chat.meta.topic = options.topic;
+
+      return chat;
+    },
+    setChatMeta: this.newChat,//the implementation is identical to newChat so it is implemented as an alias
+    getChat: function(userId, chatId) {
+      GB.requiredArguments(userId, chatId);
+      p.verifyUser(userId);
+      var chat = p.lazyChat(chatId, {owner: userId});
+
+      var chatObject = {
+        id: chat.id,
+        meta: this.getChatMeta(chatId),
+        stats: this.getChatStats(chatId)
       };
 
       return chatObject;
-    });
+    },
+    getChats: function(sorting, range) {
+      GB.requiredArguments(sorting, range);
 
-    // sort the messages first into the correct order
-    var sortedChats = _.sortBy(prunedChats, function(chat) {
-      if (sorting == persistenceCommons.ChatSorting.PARTICIPANTS) {
-        return chat.stats.participantCount;
-      }
-      else if (sorting == persistenceCommons.ChatSorting.MESSAGE_COUNT) {
-        return chat.stats.messageCount;
-      }
-      else if (sorting == persistenceCommons.ChatSorting.DATE_CREATED) {
-        return chat.meta.dateCreated;
-      }
-    });
+      // prune the raw chat first to get only what we want out, we do it now because the elements will be copied and this saves memory
+      var prunedChats = _.map(storage.chats, function(chat, key) {
+        var chatObject = {
+          id: key,
+          meta: {
+            owner: chat.meta.owner,
+            dateCreated: chat.meta.dateCreated,
+            name: chat.meta.name,
+            topic: chat.meta.topic,
+          },
+          stats: {
+            messageCount: chat.messages.length,
+            participantCount: chat.participants.length,
+          },
+        };
 
-    // convert the range into something JS understands
-    var slice = p.sliceForRange(sortedChats, range);
+        return chatObject;
+      });
 
-    // get the correct slice
-    var chats = sortedChats.slice(slice.start, slice.end);
+      // sort the messages first into the correct order
+      var sortedChats = _.sortBy(prunedChats, function(chat) {
+        if (sorting == persistenceCommons.ChatSorting.PARTICIPANTS) {
+          return chat.stats.participantCount;
+        }
+        else if (sorting == persistenceCommons.ChatSorting.MESSAGE_COUNT) {
+          return chat.stats.messageCount;
+        }
+        else if (sorting == persistenceCommons.ChatSorting.DATE_CREATED) {
+          return chat.meta.dateCreated;
+        }
+      });
 
-    //return chats, they're already in the correct format couretesy of the pruning step
-    return chats;
+      // convert the range into something JS understands
+      var slice = p.sliceForRange(sortedChats, range);
 
-  },
-  newMessage: function(userId, chatId, text) {
-    GB.requiredArguments(userId, chatId, message);
-    p.verifyUser(userId);
-    var chat = p.lazyChat(chatId, {owner: userId});
+      // get the correct slice
+      var chats = sortedChats.slice(slice.start, slice.end);
 
-    var message = {
-      date: GB.getCurrentISODate(),
-      author: userId,
-      message: text,
-    };
+      //return chats, they're already in the correct format couretesy of the pruning step
+      return chats;
 
-    chat.messages.push(message);
-  },
-  messages: function(userId, chatId, range) {
-    GB.requiredArguments(userId, chatId, range);
-    p.verifyUser(userId);
-    var chat = p.lazyChat(chatId, {owner: userId});
+    },
+    newMessage: function(userId, chatId, text) {
+      GB.requiredArguments(userId, chatId, message);
+      p.verifyUser(userId);
+      var chat = p.lazyChat(chatId, {owner: userId});
 
-    // convert the range into something JS understands
-    var slice = p.sliceForRange(chat.messages, range);
+      var message = {
+        date: GB.getCurrentISODate(),
+        author: userId,
+        message: text,
+      };
 
-    // get the messages out
-    var messages = chat.messages.slice(slice.start, slice.end);
+      chat.messages.push(message);
+    },
+    getMessages: function(userId, chatId, range) {
+      GB.requiredArguments(userId, chatId, range);
+      p.verifyUser(userId);
+      var chat = p.lazyChat(chatId, {owner: userId});
 
-    // set the the correct seq number on each message
-    _.each(messages, function(message, index) {
-      message.seq = slice.start + index;
-    });
+      // convert the range into something JS understands
+      var slice = p.sliceForRange(chat.messages, range);
 
-    return messages;
+      // get the messages out
+      var messages = chat.messages.slice(slice.start, slice.end);
+
+      // set the the correct seq number on each message
+      _.each(messages, function(message, index) {
+        message.seq = slice.start + index;
+      });
+
+      return messages;
+    }
   }
 };

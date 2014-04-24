@@ -4,5 +4,6 @@
 		"type": "inMemory",
 		"options": {}
 	},
-	"HASHING_SALT": "magic"
+	"HASHING_SALT": "magic",
+	"DEFAULT_CHAT_NAME": "Chat"
 }
