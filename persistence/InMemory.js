@@ -9,7 +9,8 @@
 var _ = require('underscore');
     GB = require('../lib/Goonbee/toolbox');
     persistenceCommons = require('./commons');
-    errors = require('../lib/Chat/errors');
+    errors = require('../lib/Chat/errors');//lm sort out this require, it's nasty
+
 
 var storage = {
   users: {},
@@ -62,7 +63,7 @@ var p = {
     return chat;
   },
   verifyUser: function(userId) {
-    if (!inMemoryPersistence.userExists(userId)) throw new errors.AuthenticationError('The user "' + userId + '" does not exist');
+    if (!inMemoryPersistence.userExists(userId)) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
   },
   sliceForRange: function(collection, range) {
     var elementCount = _.count(collection);

@@ -8,6 +8,7 @@
 
 var ttypes = require('../gen-nodejs/GoonbeeChatService_types');
 
+
 var persistenceCommons = module.export = {
 	ChatSorting: {
 		'PARTICIPANTS' : 0,
@@ -83,12 +84,3 @@ var persistenceCommons = module.export = {
     }
   }
 };
-
-
-
-// chat
-// chatMeta
-// ChatStats
-// range
-// sorting
-// message

@@ -13,24 +13,9 @@ namespace go GBSharedThriftService
 namespace cocoa GBSharedThriftService
 
 
-enum ErrorType {
-	GENERIC = 0,
-	#SUCCESS = 1,
-	MALFORMED_REQUEST = 2,
-	AUTHENTICATION = 3,
-	AUTHORIZATION = 4,
-	PHASED_OUT = 5,
-}
-
-exception RequestError {
-	1: ErrorType type,
-	2: optional string description,
-}
-
-
 service GoonbeeSharedThriftService {
 	/**
 	 * check whether the service is alive or not
 	 */
-	string alive() throws(1: RequestError error),
+	string alive();
 }

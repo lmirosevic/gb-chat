@@ -24,6 +24,11 @@ enum ChatSorting {
 
 enum ErrorType {
 	GENERIC = 0,
+	#SUCCESS = 1,
+	MALFORMED_REQUEST = 2,
+	AUTHENTICATION = 3,
+	AUTHORIZATION = 4,
+	PHASED_OUT = 5,
 }
 
 struct Range {

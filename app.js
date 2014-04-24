@@ -9,6 +9,7 @@
 // npm modules
 var thrift = require('thrift');
     nconf = require('nconf');
+    _ = require('underscore');
 
 // standard library
 var crypto = require('crypto');
@@ -20,10 +21,7 @@ var GB = require('./lib/Goonbee/toolbox');
 // app specific
 var GBChatService = require('./gen-nodejs/GoonbeeChatService');
     ttypes = require('./gen-nodejs/GoonbeeChatService_types');
-    
-//just some testing
-// var myErr = new ttypes.RequestError({type: ttypes.ErrorType.GENERIC, description: "magic"});
-// console.log(myErr);
+
 
 // Config
 nconf.argv()
@@ -39,7 +37,7 @@ persistence.api.setHashingFunction(function(input) {
 });
 
 // Server implementation
-var server = thrift.createServer(GBChatService, errors.errorHandledAPI({
+var api = {
   /** 
    * Goonbee Shared Thrift Service 
    */
@@ -53,14 +51,6 @@ var server = thrift.createServer(GBChatService, errors.errorHandledAPI({
    */
 
   isUsernameAvailable: function(username, result) {
-    // try {
-    //   var isUsernameAvailable = !persistence.api.userExists(username);
-    //   result(null, isUsernameAvailable);
-    // }
-    // catch (e) {
-    //   result(errors.convertError(e));
-    // }
-
     var isUsernameAvailable = !persistence.api.userExists(username);
 
     result(isUsernameAvailable);
@@ -109,13 +99,14 @@ var server = thrift.createServer(GBChatService, errors.errorHandledAPI({
 
     result(globalUserCount);
   },
-}));
+};
 
 // Start server
-server.listen(nconf.get('PORT'));
+thrift.createServer(GBChatService, errors.errorHandledAPI(api)).listen(nconf.get('PORT'));
+// thrift.createServer(GBChatService, api).listen(nconf.get('PORT'));//lm kill
 console.log("Server started on port " + nconf.get('PORT'));
 
-//lm need to decide what to do with errors, can I just raise them javascript style or must I create them etc. maybe I can abstract this
+//need to clean up the requires, right now it breaks LoD
 
 /*
 gonna need:
