@@ -6,10 +6,7 @@
 //  Copyright (c) 2014 Goonbee. All rights reserved.
 //
 
-namespace java goonbee.sharedThriftService
-namespace rb Goonbee.sharedThriftService
 namespace js GBSharedThriftService
-namespace go GBSharedThriftService
 namespace cocoa GBSharedThriftService
 
 

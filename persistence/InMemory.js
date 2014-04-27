@@ -99,7 +99,7 @@ var inMemoryPersistence = module.exports = {
 
       storage.users[userId] = username;
 
-      return userId;//lm this one needs to be reflected in the thrift interface, i.e. this creates a new user if userId is not supplied
+      return userId;
     },
     getUsername: function(userId) {
       GB.requiredArguments(userId);

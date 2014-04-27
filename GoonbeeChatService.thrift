@@ -9,11 +9,8 @@
 include "GoonbeeSharedThriftService.thrift"
 
 
-namespace java goonbee.chatService
-namespace rb Goonbee.ChatService
 namespace js GBChatService
-namespace go GBChatService
-namespace cocoa GBChatService
+namespace cocoa GBChat
 
 
 enum ChatSorting {
@@ -22,9 +19,9 @@ enum ChatSorting {
 	DATE_CREATED,
 }
 
-enum ErrorType {
-	GENERIC = 0,
-	#SUCCESS = 1,
+enum ResponseStatus {
+	SUCCESS = 0,
+	GENERIC = 1,
 	MALFORMED_REQUEST = 2,
 	AUTHENTICATION = 3,
 	AUTHORIZATION = 4,
@@ -62,8 +59,8 @@ struct Message {
 }
 
 exception RequestError {
-	1: ErrorType type,
-	2: optional string description,
+	1: ResponseStatus status,
+	2: optional string message,
 }
 
 

@@ -6,6 +6,8 @@
 //  Copyright (c) 2014 Goonbee. All rights reserved.
 //
 
+//lm think about potentially versioning the API calls explicitly
+
 // npm modules
 var thrift = require('thrift');
     nconf = require('nconf');
@@ -103,7 +105,6 @@ var api = {
 
 // Start server
 thrift.createServer(GBChatService, errors.errorHandledAPI(api)).listen(nconf.get('PORT'));
-// thrift.createServer(GBChatService, api).listen(nconf.get('PORT'));//lm kill
 console.log("Server started on port " + nconf.get('PORT'));
 
 //need to clean up the requires, right now it breaks LoD
