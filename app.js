@@ -32,7 +32,7 @@ nconf.argv()
 
 // Persistence layer
 var persistence = require('./persistence/' + nconf.get('PERSISTENCE').type);
-persistence.api.setHashingFunction(function(input) {
+persistence.setHashingFunction(function(input) {
   var hashInput = nconf.get('HASHING_SALT') + input.toString();
   return hashInput;//lm testing, kill
   return crypto.createHash('sha1').update(hashInput).digest('hex');
@@ -53,54 +53,46 @@ var api = {
    */
 
   isUsernameAvailable: function(username, result) {
-    var isUsernameAvailable = !persistence.api.userExists(username);
+    var isUsernameAvailable = !persistence.userExists(username);
 
     result(isUsernameAvailable);
   },
   registerUsername: function(userId, username, result) {
-    var registeredUserId = persistence.api.setUser(userId, username);
+    var registeredUserId = persistence.setUser(userId, username);
 
     result(registeredUserId);
   },
-  newChat: function(userId, chatId, chatMeta, result) {
-    var chat = persistence.commons.converters.persistenceToApi.chat(persistence.api.newChat(userId, chatId, {owner: userId, dateCreated: GB.getCurrentISODate(), name: chatMeta.name || nconf.get('DEFAULT_CHAT_NAME'), topic: chatMeta.topic}));
+  setChatOptions: function(userId, chatId, chatOptions, result) {
+    // some overrides
+    chatOptions.name = chatOptions.name || nconf.get('DEFAULT_CHAT_NAME');
+
+    var chat = persistence.setChatOptions(userId, chatId, chatOptions);
 
     result(chat);
   },
   chats: function(sorting, range, result) {
-    var sortingP = persistence.commons.converters.apiToPersistence.sorting(sorting);
-    var rangeP = persistence.commons.converters.apiToPersistence.range(range);
-
-    var chatsP = persistence.api.getChats(sortingP, rangeP);
-
-    var chats = _.map(chatsP, function(input) {
-      return persistence.commons.converters.persistenceToApi.chat(input);
-    });
+    var chats = persistence.getChats(sorting, range);
 
     result(chats);
   },
   chat: function(userId, chatId, result) {
-    var chat = persistence.commons.converters.persistenceToApi.chat(persistence.api.getChat(userId, chatId));
+    var chat = persistence.getChat(userId, chatId);
 
     result(chat);
   },
-  newMessage: function(userId, chatId, message, result) {
-    persistence.api.newMessage(userId, chatId, message.message);
+  newMessage: function(userId, chatId, content, result) {
+    persistence.newMessage(userId, chatId, content);
 
     result();
   },
   messages: function(userId, chatId, range, result) {
-    var messagesP = persistence.api.getMessages(userId, chatId, persistence.commons.converters.apiToPersistence.range(range));
-
-    var messages = _.map(messagesP, function(input) {
-      return persistence.commons.converters.persistenceToApi.message(input);
-    });
+    var messages = persistence.getMessages(userId, chatId, range);
 
     result(messages);
   },
-  setChatMeta: this.newChat,
+  newChat: this.setChatOptions,//the implementation is identical to setChatOptions so it's implemented as an alias
   globalUserCount: function(result) {
-    var globalUserCount = persistence.api.getUserCount();
+    var globalUserCount = persistence.getUserCount();
 
     result(globalUserCount);
   },
