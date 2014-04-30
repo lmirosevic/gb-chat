@@ -24,7 +24,7 @@ var p = {
     GB.requiredVariables(hashingFunction);
     offset = GB.optional(offset, 0);
 
-    var candidate = hashingFunction(_.count(field) + offset);
+    var candidate = hashingFunction(_.size(field) + offset);
     if (_.contains(field, candidate)) {
       return this(field, offset + 1);
     }
@@ -66,13 +66,26 @@ var p = {
     if (!inMemoryPersistence.userExists(userId)) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
   },
   sliceForRange: function(collection, range) {
-    var elementCount = _.count(collection);
-    var saneIndex = GB.threshold(range.start, -elementCount, elementCount-1);
-    var start = saneIndex >= 0 ? 0 + saneIndex : elementCount + saneIndex;
-    var saneLength = GB.threshold(range.length, -start, elementCount - start);
-    var end = start + saneLength;
+    var elementCount = _.size(collection);
+    
+    var saneIndex = GB.threshold(range.index, 0, elementCount);
+    var saneLength = GB.threshold(range.length, 0, elementCount - saneIndex);
 
-    return {start: start, end: end};
+    var begin;
+    var end;
+    switch (range.direction) {
+      case ttypes.RangeDirection.FORWARDS: {
+        begin = saneIndex;
+        end = begin + saneLength;
+      } break;
+
+      case ttypes.RangeDirection.BACKWARDS: {
+        end = elementCount - saneIndex;
+        begin = end - saneLength;
+      } break;
+    }
+
+    return {begin: begin, end: end};
   }
 };
 
@@ -95,7 +108,7 @@ var inMemoryPersistence = module.exports = {
       p.verifyUser(userId);
       
       // lazy creation of userId (and therewith user)
-      if (_.isUndefined(userId)) userId = hashingFunction(_.count(storage.users));
+      if (_.isUndefined(userId)) userId = hashingFunction(_.size(storage.users));
 
       storage.users[userId] = username;
 
@@ -202,7 +215,10 @@ var inMemoryPersistence = module.exports = {
       var slice = p.sliceForRange(sortedChats, range);
 
       // get the correct slice
-      var chats = sortedChats.slice(slice.start, slice.end);
+      var chats = sortedChats.slice(slice.begin, slice.end);
+
+      // potentially reverse the chats
+      if (range.direction === ttypes.RangeDirection.BACKWARDS) chats.reverse();
 
       //return chats, they're already in the correct format couretesy of the pruning step
       return chats;
@@ -230,11 +246,14 @@ var inMemoryPersistence = module.exports = {
       var slice = p.sliceForRange(chat.messages, range);
 
       // get the messages out
-      var messages = chat.messages.slice(slice.start, slice.end);
+      var messages = chat.messages.slice(slice.begin, slice.end);
+
+      // potentially reverse the messages
+      if (range.direction === ttypes.RangeDirection.BACKWARDS) messages.reverse();
 
       // set the the correct seq number on each message
       _.each(messages, function(message, index) {
-        message.seq = slice.start + index;
+        message.seq = slice.begin + index;
       });
 
       return messages;

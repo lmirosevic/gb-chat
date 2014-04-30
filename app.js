@@ -68,7 +68,10 @@ var api = {
     result(chat);
   },
   chats: function(sorting, range, result) {
-    var chatsP = persistence.api.getChats(persistence.commons.converters.apiToPersistence.api.sorting(sorting), persistence.commons.converters.apiToPersistence.api.range(range));
+    var sortingP = persistence.commons.converters.apiToPersistence.sorting(sorting);
+    var rangeP = persistence.commons.converters.apiToPersistence.range(range);
+
+    var chatsP = persistence.api.getChats(sortingP, rangeP);
 
     var chats = _.map(chatsP, function(input) {
       return persistence.commons.converters.persistenceToApi.chat(input);
@@ -87,7 +90,7 @@ var api = {
     result();
   },
   messages: function(userId, chatId, range, result) {
-    var messagesP = persistence.api.getMessages(userId, chatId, persistence.commons.converters.apiToPersistence.api.range(range));
+    var messagesP = persistence.api.getMessages(userId, chatId, persistence.commons.converters.apiToPersistence.range(range));
 
     var messages = _.map(messagesP, function(input) {
       return persistence.commons.converters.persistenceToApi.message(input);

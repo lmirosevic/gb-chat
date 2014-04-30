@@ -28,9 +28,15 @@ enum ResponseStatus {
 	PHASED_OUT = 5,
 }
 
+enum RangeDirection {
+	FORWARDS = 0,
+	BACKWARDS = 1,
+}
+
 struct Range {
-	1: i32 index,
-	2: i32 length,
+	1: RangeDirection direction,
+	2: i32 index,
+	3: i32 length,
 }
 
 struct ChatStats {
@@ -110,59 +116,3 @@ service GoonbeeChatService extends GoonbeeSharedThriftService.GoonbeeSharedThrif
 	 */
 	i32					globalUserCount			()																	throws(1: RequestError error),
 }
-
-/*
-
-Bool				isUsernameAvailable		(String username)										//lets you check whether the username is available or not
-String 				registerUsername		(String userId[optional], String username)				//lets you register a username, or change it if you are already registered
-
-Void 				newChat					(String userId, ChatMeta chatMeta)						//create a new chat channel
-Array<Chat> 		chats					(ChatSorting sorting, Range range)						//return info on all available chat channels (e.g. how many messages, participators, date created, etc.)
-Chat 				chat 	 				(String chatId)											//returns info on a particular channel
-
-Void				newMessage				(String userId, String chatId, Message message)			//posts a new message on a certain chat channel
-Array<Message> 		messages				(String chatId, Range range)							//returns messags for a chat channel, according to range
-
-
-Void 				setChatMeta				(String chatId, ChatMeta chatMeta)						//let's you update a chat's options
-Int					globalUserCount			()
-
-
-
-struct Chat {
-	1: required string id
-	2: required ChatMeta meta
-	3: required ChatStats stats
-}
-
-struct ChatStats {
-	1: required Int messageCount
-	2: required Int participantCount
-}
-
-struct ChatMeta {
-	String name
-	String topic
-	String dateCreated
-}
-
-struct Message {
-	Int seq
-	String date
-	String author
-	String message
-}
-
-enum ChatSorting {
-	participantCount
-	messageCount
-	messageVelocity
-	dateCreated
-}
-
-struct Range {
-	Int index
-	int length
-}
-
-*/

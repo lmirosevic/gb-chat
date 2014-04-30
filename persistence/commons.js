@@ -27,18 +27,18 @@ var persistenceCommons = module.exports = {
         return {messageCount: chatStats.messageCount, participantCount: chatStats.participantCount};
       },
       range: function(range) {
-        return {index: range.index, length: range.length};
+        return {direction: range.direction, index: range.index, length: range.length};
       },
       sorting: function(sorting) {
         var sortingP;
         switch (sorting) {
-          case GBChatService.ChatSorting.PARTICIPANTS: {
+          case ttypes.ChatSorting.PARTICIPANTS: {
             sortingP = persistenceCommons.ChatSorting.PARTICIPANTS;
           } break;
-          case GBChatService.ChatSorting.MESSAGE_COUNT: {
+          case ttypes.ChatSorting.MESSAGE_COUNT: {
             sortingP = persistenceCommons.ChatSorting.MESSAGE_COUNT;
           } break;
-          case GBChatService.ChatSorting.DATE_CREATED: {
+          case ttypes.ChatSorting.DATE_CREATED: {
             sortingP = persistenceCommons.ChatSorting.DATE_CREATED;
           } break;
         }
@@ -60,19 +60,19 @@ var persistenceCommons = module.exports = {
         return new ttypes.ChatStats({messageCount: chatStatsP.messageCount, participantCount: chatStatsP.participantCount});
       },
       range: function(rangeP) {
-        return new ttypes.Range({index: rangeP.index, length: rangeP.length});
+        return new ttypes.Range({direction: rangeP.direction, index: rangeP.index, length: rangeP.length});
       },
       sorting: function(sortingP) {
         var sorting;
         switch (sortingP) {
           case persistenceCommons.ChatSorting.PARTICIPANTS: {
-            sorting = GBChatService.ChatSorting.PARTICIPANTS;
+            sorting = ttypes.ChatSorting.PARTICIPANTS;
           } break;
           case persistenceCommons.ChatSorting.MESSAGE_COUNT: {
-            sorting = GBChatService.ChatSorting.MESSAGE_COUNT;
+            sorting = ttypes.ChatSorting.MESSAGE_COUNT;
           } break;
           case persistenceCommons.ChatSorting.DATE_CREATED: {
-            sorting = GBChatService.ChatSorting.DATE_CREATED;
+            sorting = ttypes.ChatSorting.DATE_CREATED;
           } break;
         }
         
