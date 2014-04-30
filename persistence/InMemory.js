@@ -193,7 +193,7 @@ var inMemoryPersistence = module.exports = {
     });
 
     // convert the range into something JS understands
-    var slice = p.sliceForRange(sortedChats, range);
+    var slice = p.sliceForRange(chats, range);
 
     // get the correct slice
     chats = chats.slice(slice.begin, slice.end);
