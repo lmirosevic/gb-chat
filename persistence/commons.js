@@ -9,7 +9,7 @@
 var ttypes = require('../gen-nodejs/GoonbeeChatService_types');
 
 
-var persistenceCommons = module.export = {
+var persistenceCommons = module.exports = {
 	ChatSorting: {
 		'PARTICIPANTS' : 0,
 		'MESSAGE_COUNT' : 1,
