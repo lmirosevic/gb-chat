@@ -12,7 +12,8 @@
 	"dependencies": {
 		"thrift": "0.9.x",
 		"nconf": "0.6.x",
-		"underscore": "1.6.x"
+		"underscore": "1.6.x",
+		"cli-color": "0.3.x"
 	},
 	"devDependencies": {
 		"nodemon": "1.0.x"

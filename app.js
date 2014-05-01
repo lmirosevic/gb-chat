@@ -30,6 +30,8 @@ nconf.argv()
      .env()
      .file({file: './config/defaults.json'});
 
+errors.setShouldLogOutput(nconf.get('LOG_OUTPUT'));
+
 // Persistence layer
 var persistence = require('./persistence/' + nconf.get('PERSISTENCE').type);
 persistence.setHashingFunction(function(input) {
