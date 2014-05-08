@@ -7,6 +7,8 @@
 //
 
 //lm think about potentially versioning the API calls explicitly
+//lm might need to add a different message type like "status" to enable things like "luka change the room topic to 'blabla'"
+//lm currently the id generation algorithm is the same for chatIds and userIds, this leaves the potential to compromise users by creating new lazy chats, which will reveal userIds... that's bad
 
 // npm modules
 var thrift = require('thrift');
@@ -35,7 +37,7 @@ errors.setShouldLogOutput(nconf.get('LOG_OUTPUT'));
 // Persistence layer
 var persistence = require('./persistence/' + nconf.get('PERSISTENCE').type);
 persistence.setHashingFunction(function(input) {
-  var hashInput = nconf.get('HASHING_SALT') + input.toString();
+  var hashInput = input.toString() + nconf.get('HASHING_SALT');
   return hashInput;//lm testing, kill
   return crypto.createHash('sha1').update(hashInput).digest('hex');
 });
@@ -92,13 +94,13 @@ var api = {
 
     result(messages);
   },
-  newChat: this.setChatOptions,//the implementation is identical to setChatOptions so it's implemented as an alias
   globalUserCount: function(result) {
     var globalUserCount = persistence.getUserCount();
 
     result(globalUserCount);
   },
 };
+api.newChat = api.setChatOptions;//the implementation is identical to setChatOptions so it's implemented as an alias
 
 // Start server
 thrift.createServer(GBChatService, errors.errorHandledAPI(api)).listen(nconf.get('PORT'));

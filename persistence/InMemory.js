@@ -58,8 +58,12 @@ var p = {
       storage.chats[chatId] = rawChat;
     }
 
+    //create a representationalChat, which is like the rawChat but with the id property set
+    var representationalChat = _.clone(rawChat);
+    representationalChat.id = chatId;
+
     // return either the original existing chat or the newly initialized and committed one
-    return rawChat;
+    return representationalChat;
   },
   verifyUser: function(userId) {
     if (!inMemoryPersistence.userExists(userId)) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
@@ -97,15 +101,14 @@ var inMemoryPersistence = module.exports = {
   userExists: function(username) {
     GB.requiredArguments(username);
 
-    return _.contains(storage.users, username);
+    return _.has(storage.users, username);
   },
   setUser: function(userId, username) {
     GB.requiredArguments(username);
     GB.requiredVariables(hashingFunction);
-    p.verifyUser(userId);
-    
+
     // lazy creation of userId (and therewith user)
-    if (_.isUndefined(userId)) userId = hashingFunction(_.size(storage.users));
+    if (_.isUndefined(userId) || _.isNull(userId)) userId = hashingFunction(_.size(storage.users));
 
     storage.users[userId] = username;
 
@@ -123,11 +126,11 @@ var inMemoryPersistence = module.exports = {
   getChatStats: function(userId, chatId) {
     GB.requiredArguments(userId, chatId);
     p.verifyUser(userId);
-    var rawChat = p.lazyChat(chatId, userId);
+    var representationalChat = p.lazyChat(chatId, userId);
 
     var stats = new ttypes.ChatStats({
-      messageCount: _.count(rawChat.messages),
-      participantCount: _.count(rawChat.participants),
+      messageCount: _.count(representationalChat.messages),
+      participantCount: _.count(representationalChat.participants),
     });
 
     return stats;
@@ -135,35 +138,62 @@ var inMemoryPersistence = module.exports = {
   getChatMeta: function(userId, chatId) {
     GB.requiredArguments(userId, chatId);
     p.verifyUser(userId);
-    var rawChat = p.lazyChat(chatId, userId);
+    var representationalChat = p.lazyChat(chatId, userId);
 
-    var meta = {
-      owner: rawChat.meta.owner,
-      dateCreated: rawChat.meta.dateCreated,
-      name: rawChat.meta.name,
-      topic: rawChat.meta.topic,
-    };
+    var meta = ttypes.ChatMeta({
+      owner: representationalChat.meta.owner,
+      dateCreated: representationalChat.meta.dateCreated,
+      name: representationalChat.meta.name,
+      topic: representationalChat.meta.topic
+    });
 
     return meta;
   },
   setChatOptions: function(userId, chatId, chatOptions) {
     GB.requiredArguments(userId, chatOptions);
     p.verifyUser(userId);
-    var rawChat = p.lazyChat(chatId, userId, chatOptions);
+    var representationalChat = p.lazyChat(chatId, userId, chatOptions);
 
     // commit the meta fields which may be optionally passed down
-    if (!_.isUndefined(chatOptions.name)) rawChat.meta.name = chatOptions.name;
-    if (!_.isUndefined(chatOptions.topic)) rawChat.meta.topic = chatOptions.topic;
+    if (!_.isUndefined(chatOptions.name)) representationalChat.meta.name = chatOptions.name;
+    if (!_.isUndefined(chatOptions.topic)) representationalChat.meta.topic = chatOptions.topic;
 
-    return rawChat;
+    // convert it to the correct type
+    var chat = new ttypes.Chat({
+      id: representationalChat.id, 
+      meta: new ttypes.ChatMeta({
+        owner: representationalChat.meta.owner, 
+        dateCreated: representationalChat.meta.dateCreated, 
+        name: representationalChat.meta.name, 
+        topic: representationalChat.meta.topic
+      }), 
+      stats: new ttypes.ChatStats({
+        participantCount: _.size(representationalChat.participants), 
+        messageCount: _.size(representationalChat.messages)
+      })
+    });
+
+    return chat;
   },
   getChat: function(userId, chatId) {
     GB.requiredArguments(userId, chatId);
     p.verifyUser(userId);
-    var rawChat = p.lazyChat(chatId, userId);
+    var representationalChat = p.lazyChat(chatId, userId);
 
     // convert it to the correct type
-    var chat = new ttypes.Chat({id: chatId, meta: new ttypes.ChatMeta({owner: rawChat.meta.owner, dateCreated: rawChat.meta.dateCreated, name: rawChat.meta.name, topic: rawChat.meta.topic}), stats: new ttypes.ChatStats({participantCount: _.size(rawChat.participants), messageCount: _.size(rawChat.messages)})});
+    var chat = new ttypes.Chat({
+      id: representationalChat.id, 
+      meta: new ttypes.ChatMeta({
+        owner: representationalChat.meta.owner, 
+        dateCreated: representationalChat.meta.dateCreated, 
+        name: representationalChat.meta.name, 
+        topic: representationalChat.meta.topic
+      }), 
+      stats: new ttypes.ChatStats({
+        participantCount: _.size(representationalChat.participants), 
+        messageCount: _.size(representationalChat.messages)
+      })
+    });
 
     return chat;
   },
@@ -171,8 +201,20 @@ var inMemoryPersistence = module.exports = {
     GB.requiredArguments(sorting, range);
 
     // prune the raw chat first to get only what we want out, we do it now because the elements will be copied and this saves memory
-    var chats = _.map(storage.chats, function(rawChat, chatId) {
-      return new ttypes.Chat({id: chatId, meta: new ttypes.ChatMeta({owner: rawChat.meta.owner, dateCreated: rawChat.meta.dateCreated, name: rawChat.meta.name, topic: rawChat.meta.topic}), stats: new ttypes.ChatStats({participantCount: _.size(rawChat.participants), messageCount: _.size(rawChat.messages)})});
+    var chats = _.map(storage.chats, function(representationalChat, chatId) {
+      return new ttypes.Chat({
+        id: chatId, 
+        meta: new ttypes.ChatMeta({
+          owner: representationalChat.meta.owner, 
+          dateCreated: representationalChat.meta.dateCreated, 
+          name: representationalChat.meta.name, 
+          topic: representationalChat.meta.topic
+        }), 
+        stats: new ttypes.ChatStats({
+          participantCount: _.size(representationalChat.participants), 
+          messageCount: _.size(representationalChat.messages)
+        })
+      });
     });
 
     // sort the chats first into the correct order
@@ -203,12 +245,11 @@ var inMemoryPersistence = module.exports = {
 
     //return chats, they're already in the correct format
     return chats;
-
   },
   newMessage: function(userId, chatId, content) {
     GB.requiredArguments(userId, chatId, message);
     p.verifyUser(userId);
-    var rawChat = p.lazyChat(chatId, userId);
+    var representationalChat = p.lazyChat(chatId, userId);
 
     var rawMessage = {
       date: GB.getCurrentISODate(),
@@ -216,22 +257,27 @@ var inMemoryPersistence = module.exports = {
       content: content,
     };
 
-    rawChat.messages.push(rawMessage);
+    representationalChat.messages.push(rawMessage);
   },
   getMessages: function(userId, chatId, range) {
     GB.requiredArguments(userId, chatId, range);
     p.verifyUser(userId);
-    var rawChat = p.lazyChat(chatId, userId);
+    var representationalChat = p.lazyChat(chatId, userId);
 
     // convert the range into something JS understands
-    var slice = p.sliceForRange(rawChat.messages, range);
+    var slice = p.sliceForRange(representationalChat.messages, range);
 
     // get the messages out
-    var rawMessages = rawChat.messages.slice(slice.begin, slice.end);
+    var rawMessages = representationalChat.messages.slice(slice.begin, slice.end);
 
     // convert rawMessages into Message objects
     var messages = _.each(rawMessages, function(rawMessage, index) {
-      return new ttypes.Message({seq: slice.begin + index, dateCreated: rawMessage.dateCreated, author: rawMessage.author, content: rawMessage.content});
+      return new ttypes.Message({
+        seq: slice.begin + index, 
+        dateCreated: rawMessage.dateCreated, 
+        author: rawMessage.author, 
+        content: rawMessage.content
+      });
     });
 
     // potentially reverse the messages
