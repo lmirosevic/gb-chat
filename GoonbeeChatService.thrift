@@ -65,7 +65,7 @@ struct Chat {
 struct Message {
     1: i32 seq,
     2: string dateCreated,
-    3: string author,
+    3: string authorName,
     4: string content,
 }
 
