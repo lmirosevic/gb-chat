@@ -18,14 +18,15 @@ var storage = {
 var hashingFunction;
 
 var p = {
-  autoId: function(field, offset) {
+  autoId: function(field, prefix, offset) {
     GB.requiredArguments(field);
     GB.requiredVariables(hashingFunction);
     offset = GB.optional(offset, 0);
 
-    var candidate = hashingFunction(_.size(field) + offset);
+    var itemCount = _.size(field) + offset;
+    var candidate = hashingFunction(prefix + itemCount.toString());
     if (_.contains(field, candidate)) {
-      return this(field, offset + 1);
+      return this(field, prefix, offset + 1);
     }
     else {
       return candidate;
@@ -40,7 +41,7 @@ var p = {
     // lazily create it if it does not exist
     if (_.isUndefined(rawChat)) {
       // generate id for it if necessary
-      chatId = GB.optional(chatId, p.autoId(storage.chats));
+      chatId = GB.optional(chatId, p.autoId(storage.chats, 'chat'));
 
       // initialize it
       rawChat = {
@@ -108,7 +109,7 @@ var inMemoryPersistence = module.exports = {
     GB.requiredVariables(hashingFunction);
 
     // lazy creation of userId (and therewith user)
-    if (_.isUndefined(userId) || _.isNull(userId)) userId = hashingFunction(_.size(storage.users));
+    if (_.isUndefined(userId) || _.isNull(userId)) userId = p.autoId(storage.users, 'user');
 
     storage.users[userId] = username;
 

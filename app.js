@@ -8,7 +8,6 @@
 
 //lm think about potentially versioning the API calls explicitly
 //lm might need to add a different message type like "status" to enable things like "luka change the room topic to 'blabla'"
-//lm currently the id generation algorithm is the same for chatIds and userIds, this leaves the potential to compromise users by creating new lazy chats, which will reveal userIds... that's bad
 
 // npm modules
 var thrift = require('thrift');
