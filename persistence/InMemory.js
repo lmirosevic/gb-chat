@@ -17,8 +17,8 @@ var storage = {
 };
 var hashingFunction;
 
-var p = {
-  autoId: function(field, prefix, offset) {
+var P = function() {
+  this.autoId = function(field, prefix, offset) {
     GB.requiredArguments(field);
     GB.requiredVariables(hashingFunction);
     offset = GB.optional(offset, 0);
@@ -31,10 +31,12 @@ var p = {
     else {
       return candidate;
     }
-  },
-  lazyChat: function(chatId, owner, chatOptions) {
-    GB.requiredArguments(owner);
+  };
 
+  this.lazyChat = function(chatId, owner, chatOptions) {
+    GB.requiredArguments(owner);
+    chatOptions = GB.optional(chatOptions, {});
+    
     // attempt to get existing chat
     var rawChat = storage.chats[chatId];
 
@@ -48,8 +50,8 @@ var p = {
         meta: {
           owner: owner,
           dateCreated: GB.getCurrentISODate(),
-          name: chatOptions.name || null,
-          topic: chatOptions.topic || null,
+          name: GB.optional(chatOptions.name, null),
+          topic: GB.optional(chatOptions.topic, null),
         },
         participants: [],
         messages: []
@@ -65,11 +67,13 @@ var p = {
 
     // return either the original existing chat or the newly initialized and committed one
     return representationalChat;
-  },
-  verifyUser: function(userId) {
-    if (!inMemoryPersistence.userExists(userId)) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
-  },
-  sliceForRange: function(collection, range) {
+  };
+
+  this.verifyUser = function(userId) {
+    if (!this.isUserIdRegistered(userId)) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
+  };
+  
+  this.sliceForRange = function(collection, range) {
     var elementCount = _.size(collection);
     
     var saneIndex = GB.threshold(range.index, 0, elementCount);
@@ -90,8 +94,21 @@ var p = {
     }
 
     return {begin: begin, end: end};
-  }
+  };
+
+  this.usernameExists = function(username) {
+    GB.requiredArguments(username);
+
+    return _.contains(storage.users, username);
+  };
+
+  this.isUserIdRegistered = function(userId) {
+    GB.requiredArguments(userId);
+
+    return _.has(storage.users, userId);
+  };
 };
+var p = new P();
 
 var inMemoryPersistence = module.exports = {
   setHashingFunction: function(handler) {
@@ -99,18 +116,18 @@ var inMemoryPersistence = module.exports = {
 
     hashingFunction = handler;
   },
-  userExists: function(username) {
+  isUsernameAvailable: function(username) {
     GB.requiredArguments(username);
 
-    return _.has(storage.users, username);
+    return !p.usernameExists(username);
   },
   setUser: function(userId, username) {
     GB.requiredArguments(username);
     GB.requiredVariables(hashingFunction);
 
-    // lazy creation of userId (and therewith user)
-    if (_.isUndefined(userId) || _.isNull(userId)) userId = p.autoId(storage.users, 'user');
-
+    // lazy creation of userId
+    userId = GB.optional(userId, p.autoId(storage.users, 'user'));
+    // ...and therewith user
     storage.users[userId] = username;
 
     return userId;
@@ -155,9 +172,10 @@ var inMemoryPersistence = module.exports = {
     p.verifyUser(userId);
     var representationalChat = p.lazyChat(chatId, userId, chatOptions);
 
-    // commit the meta fields which may be optionally passed down
-    if (!_.isUndefined(chatOptions.name)) representationalChat.meta.name = chatOptions.name;
-    if (!_.isUndefined(chatOptions.topic)) representationalChat.meta.topic = chatOptions.topic;
+    // commit the meta fields if they've been set
+    var rawChat = storage.chats[representationalChat.id];
+    if (!_.isUndefined(chatOptions.name)) rawChat.meta.name = chatOptions.name;
+    if (!_.isUndefined(chatOptions.topic)) rawChat.meta.topic = chatOptions.topic;
 
     // convert it to the correct type
     var chat = new ttypes.Chat({
@@ -248,17 +266,22 @@ var inMemoryPersistence = module.exports = {
     return chats;
   },
   newMessage: function(userId, chatId, content) {
-    GB.requiredArguments(userId, chatId, message);
+    GB.requiredArguments(userId, chatId, content);
     p.verifyUser(userId);
     var representationalChat = p.lazyChat(chatId, userId);
 
+    var rawChat = storage.chats[representationalChat.id];
+
     var rawMessage = {
-      date: GB.getCurrentISODate(),
-      author: userId,
+      dateCreated: GB.getCurrentISODate(),
+      authorId: userId,
       content: content,
     };
 
-    representationalChat.messages.push(rawMessage);
+    // insert message
+    rawChat.messages.push(rawMessage);
+    // insert participant
+    if (!_.contains(rawChat.participants, userId)) rawChat.participants.push(userId);
   },
   getMessages: function(userId, chatId, range) {
     GB.requiredArguments(userId, chatId, range);
@@ -272,11 +295,14 @@ var inMemoryPersistence = module.exports = {
     var rawMessages = representationalChat.messages.slice(slice.begin, slice.end);
 
     // convert rawMessages into Message objects
-    var messages = _.each(rawMessages, function(rawMessage, index) {
+    var messages = _.map(rawMessages, function(rawMessage, index) {
+      // get the name of the author
+      var authorName = storage.users[rawMessage.authorId];
+
       return new ttypes.Message({
         seq: slice.begin + index, 
         dateCreated: rawMessage.dateCreated, 
-        author: rawMessage.author, 
+        authorName: authorName,
         content: rawMessage.content
       });
     });

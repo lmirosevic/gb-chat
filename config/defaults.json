@@ -5,6 +5,8 @@
 		"options": {}
 	},
 	"HASHING_SALT": "magic",
-	"DEFAULT_CHAT_NAME": "Chat",
-	"LOG_OUTPUT": true
+	"DEFAULT_CHAT_NAME": null,
+	"LOG_CALLS": true,
+	"LOG_OUTPUT": true,
+	"LOG_ERRORS": true
 }

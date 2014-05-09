@@ -32,6 +32,8 @@ nconf.argv()
      .file({file: './config/defaults.json'});
 
 errors.setShouldLogOutput(nconf.get('LOG_OUTPUT'));
+errors.setShouldLogCalls(nconf.get('LOG_CALLS'));
+errors.setShouldLogErrors(nconf.get('LOG_ERRORS'));
 
 // Persistence layer
 var persistence = require('./persistence/' + nconf.get('PERSISTENCE').type);
@@ -56,7 +58,7 @@ var api = {
    */
 
   isUsernameAvailable: function(username, result) {
-    var isUsernameAvailable = !persistence.userExists(username);
+    var isUsernameAvailable = persistence.isUsernameAvailable(username);
 
     result(isUsernameAvailable);
   },
@@ -66,8 +68,8 @@ var api = {
     result(registeredUserId);
   },
   setChatOptions: function(userId, chatId, chatOptions, result) {
-    // some overrides
-    chatOptions.name = chatOptions.name || nconf.get('DEFAULT_CHAT_NAME');
+    chatOptions = GB.optional(chatOptions, {});
+    chatOptions.name = GB.optional(chatOptions.name, nconf.get('DEFAULT_CHAT_NAME'));
 
     var chat = persistence.setChatOptions(userId, chatId, chatOptions);
 
