@@ -6,9 +6,10 @@
 //  Copyright (c) 2014 Goonbee. All rights reserved.
 //
 
-var _ = require('underscore');
-    GB = require('../lib/Goonbee/toolbox');
-    errors = require('../lib/Chat/errors');//lm sort out this require, it's nasty
+var _ = require('underscore'),
+    GB = require('../lib/Goonbee/toolbox'),
+    errors = require('../lib/Chat/errors'),//lm sort out this require, it's nasty
+    ttypes = require('../gen-nodejs/GoonbeeChatService_types');
 
 var storage = {
   users: {},
@@ -60,12 +61,7 @@ var P = function() {
         storage.chats[chatId] = rawChat;
       }
 
-      //create a representationalChat, which is like the rawChat but with the id property set
-      var representationalChat = _.clone(rawChat);
-      representationalChat.id = chatId;
-
-      // return either the original existing chat or the newly initialized and committed one
-      GB.callCallback(callback, representationalChat);
+      GB.callCallback(callback, chatId);
     });
   };
 
@@ -154,10 +150,12 @@ var inMemoryPersistence = module.exports = {
   getChatStats: function(userId, chatId, callback) {
     GB.requiredArguments(userId, chatId);
     p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(representationalChat) {
+      p.lazyChat(chatId, userId, undefined, function(chatId) {
+        var storedChat = storage.chats[chatId];
+
         var stats = new ttypes.ChatStats({
-          messageCount: _.count(representationalChat.messages),
-          participantCount: _.count(representationalChat.participants),
+          messageCount: _.count(storedChat.messages),
+          participantCount: _.count(storedChat.participants),
         });
 
         GB.callCallback(callback, stats);
@@ -167,12 +165,14 @@ var inMemoryPersistence = module.exports = {
   getChatMeta: function(userId, chatId, callback) {
     GB.requiredArguments(userId, chatId);
     p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(representationalChat) {
+      p.lazyChat(chatId, userId, undefined, function(chatId) {
+        var storedChat = storage.chats[chatId];
+
         var meta = ttypes.ChatMeta({
-          owner: representationalChat.meta.owner,
-          dateCreated: representationalChat.meta.dateCreated,
-          name: representationalChat.meta.name,
-          topic: representationalChat.meta.topic
+          owner: storedChat.meta.owner,
+          dateCreated: storedChat.meta.dateCreated,
+          name: storedChat.meta.name,
+          topic: storedChat.meta.topic
         });
 
         GB.callCallback(callback, meta);
@@ -182,24 +182,25 @@ var inMemoryPersistence = module.exports = {
   setChatOptions: function(userId, chatId, chatOptions, callback) {
     GB.requiredArguments(userId, chatOptions);
     p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, chatOptions, function(representationalChat) {
+      p.lazyChat(chatId, userId, undefined, function(chatId) {
+        var storedChat = storage.chats[chatId];
+
         // commit the meta fields if they've been set
-        var rawChat = storage.chats[representationalChat.id];
-        if (!_.isUndefined(chatOptions.name)) rawChat.meta.name = chatOptions.name;
-        if (!_.isUndefined(chatOptions.topic)) rawChat.meta.topic = chatOptions.topic;
+        if (!_.isUndefined(chatOptions.name)) storedChat.meta.name = chatOptions.name;
+        if (!_.isUndefined(chatOptions.topic)) storedChat.meta.topic = chatOptions.topic;
 
         // convert it to the correct type
         var chat = new ttypes.Chat({
-          id: representationalChat.id, 
+          id: chatId, 
           meta: new ttypes.ChatMeta({
-            owner: representationalChat.meta.owner, 
-            dateCreated: representationalChat.meta.dateCreated, 
-            name: representationalChat.meta.name, 
-            topic: representationalChat.meta.topic
+            owner: storedChat.meta.owner, 
+            dateCreated: storedChat.meta.dateCreated, 
+            name: storedChat.meta.name, 
+            topic: storedChat.meta.topic
           }), 
           stats: new ttypes.ChatStats({
-            participantCount: _.size(representationalChat.participants), 
-            messageCount: _.size(representationalChat.messages)
+            participantCount: _.size(storedChat.participants), 
+            messageCount: _.size(storedChat.messages)
           })
         });
 
@@ -210,19 +211,21 @@ var inMemoryPersistence = module.exports = {
   getChat: function(userId, chatId, callback) {
     GB.requiredArguments(userId, chatId);
     p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(representationalChat) {
+      p.lazyChat(chatId, userId, undefined, function(chatId) {
+        var storedChat = storage.chats[chatId];
+        
         // convert it to the correct type
         var chat = new ttypes.Chat({
-          id: representationalChat.id, 
+          id: chatId, 
           meta: new ttypes.ChatMeta({
-            owner: representationalChat.meta.owner, 
-            dateCreated: representationalChat.meta.dateCreated, 
-            name: representationalChat.meta.name, 
-            topic: representationalChat.meta.topic
+            owner: storedChat.meta.owner, 
+            dateCreated: storedChat.meta.dateCreated, 
+            name: storedChat.meta.name, 
+            topic: storedChat.meta.topic
           }), 
           stats: new ttypes.ChatStats({
-            participantCount: _.size(representationalChat.participants), 
-            messageCount: _.size(representationalChat.messages)
+            participantCount: _.size(storedChat.participants), 
+            messageCount: _.size(storedChat.messages)
           })
         });
 
@@ -283,8 +286,8 @@ var inMemoryPersistence = module.exports = {
   newMessage: function(userId, chatId, content, callback) {
     GB.requiredArguments(userId, chatId, content);
     p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(representationalChat) {
-        var rawChat = storage.chats[representationalChat.id];
+      p.lazyChat(chatId, userId, undefined, function(chatId) {
+        var storedChat = storage.chats[chatId];
 
         var rawMessage = {
           dateCreated: GB.getCurrentISODate(),
@@ -293,9 +296,9 @@ var inMemoryPersistence = module.exports = {
         };
 
         // insert message
-        rawChat.messages.push(rawMessage);
+        storedChat.messages.push(rawMessage);
         // insert participant
-        if (!_.contains(rawChat.participants, userId)) rawChat.participants.push(userId);
+        if (!_.contains(storedChat.participants, userId)) storedChat.participants.push(userId);
 
         GB.callCallback(callback);
       });  
@@ -304,11 +307,13 @@ var inMemoryPersistence = module.exports = {
   getMessages: function(userId, chatId, range, callback) {
     GB.requiredArguments(userId, chatId, range);
     p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(representationalChat) {
+      p.lazyChat(chatId, userId, undefined, function(chatId) {
+        var storedChat = storage.chats[chatId];
+
         // convert the range into something JS understands
-        p.sliceForRange(representationalChat.messages, range, function(slice) {
+        p.sliceForRange(storedChat.messages, range, function(slice) {
           // get the messages out
-          var rawMessages = representationalChat.messages.slice(slice.begin, slice.end);
+          var rawMessages = storedChat.messages.slice(slice.begin, slice.end);
 
           // convert rawMessages into Message objects
           var messages = _.map(rawMessages, function(rawMessage, index) {
