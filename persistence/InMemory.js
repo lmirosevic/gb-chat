@@ -10,7 +10,6 @@ var _ = require('underscore');
     GB = require('../lib/Goonbee/toolbox');
     errors = require('../lib/Chat/errors');//lm sort out this require, it's nasty
 
-
 var storage = {
   users: {},
   chats: {}
@@ -18,7 +17,7 @@ var storage = {
 var hashingFunction;
 
 var P = function() {
-  this.autoId = function(field, prefix, offset) {
+  this.autoId = function(field, prefix, offset, callback) {
     GB.requiredArguments(field);
     GB.requiredVariables(hashingFunction);
     offset = GB.optional(offset, 0);
@@ -26,54 +25,59 @@ var P = function() {
     var itemCount = _.size(field) + offset;
     var candidate = hashingFunction(prefix + itemCount.toString());
     if (_.contains(field, candidate)) {
-      return this(field, prefix, offset + 1);
+      GB.callCallback(callback, this(field, prefix, offset + 1, callback));
     }
     else {
-      return candidate;
+      GB.callCallback(callback, candidate);
     }
   };
 
-  this.lazyChat = function(chatId, owner, chatOptions) {
+  this.lazyChat = function(chatId, owner, chatOptions, callback) {
     GB.requiredArguments(owner);
     chatOptions = GB.optional(chatOptions, {});
     
     // attempt to get existing chat
     var rawChat = storage.chats[chatId];
 
-    // lazily create it if it does not exist
-    if (_.isUndefined(rawChat)) {
-      // generate id for it if necessary
-      chatId = GB.optional(chatId, p.autoId(storage.chats, 'chat'));
+    p.autoId(storage.chats, 'chat', undefined, function(generatedId) {
+      if (_.isUndefined(rawChat)) {
+        // generate id for it if necessary
+        chatId = GB.optional(chatId, generatedId);
 
-      // initialize it
-      rawChat = {
-        meta: {
-          owner: owner,
-          dateCreated: GB.getCurrentISODate(),
-          name: GB.optional(chatOptions.name, null),
-          topic: GB.optional(chatOptions.topic, null),
-        },
-        participants: [],
-        messages: []
-      };
+        // initialize it
+        rawChat = {
+          meta: {
+            owner: owner,
+            dateCreated: GB.getCurrentISODate(),
+            name: GB.optional(chatOptions.name, null),
+            topic: GB.optional(chatOptions.topic, null),
+          },
+          participants: [],
+          messages: []
+        };
 
-      // commit it
-      storage.chats[chatId] = rawChat;
-    }
+        // commit it
+        storage.chats[chatId] = rawChat;
+      }
 
-    //create a representationalChat, which is like the rawChat but with the id property set
-    var representationalChat = _.clone(rawChat);
-    representationalChat.id = chatId;
+      //create a representationalChat, which is like the rawChat but with the id property set
+      var representationalChat = _.clone(rawChat);
+      representationalChat.id = chatId;
 
-    // return either the original existing chat or the newly initialized and committed one
-    return representationalChat;
+      // return either the original existing chat or the newly initialized and committed one
+      GB.callCallback(callback, representationalChat);
+    });
   };
 
-  this.verifyUser = function(userId) {
-    if (!this.isUserIdRegistered(userId)) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
+  this.verifyUser = function(userId, callback) {
+    p.isUserIdRegistered(userId, function(isUserIdRegistered) {
+      if (!isUserIdRegistered) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
+
+      GB.callCallback(callback);
+    });
   };
   
-  this.sliceForRange = function(collection, range) {
+  this.sliceForRange = function(collection, range, callback) {
     var elementCount = _.size(collection);
     
     var saneIndex = GB.threshold(range.index, 0, elementCount);
@@ -93,130 +97,140 @@ var P = function() {
       } break;
     }
 
-    return {begin: begin, end: end};
+    GB.callCallback(callback, {begin: begin, end: end});
   };
 
-  this.usernameExists = function(username) {
+  this.usernameExists = function(username, callback) {
     GB.requiredArguments(username);
 
-    return _.contains(storage.users, username);
+    GB.callCallback(callback, _.contains(storage.users, username));
   };
 
-  this.isUserIdRegistered = function(userId) {
+  this.isUserIdRegistered = function(userId, callback) {
     GB.requiredArguments(userId);
 
-    return _.has(storage.users, userId);
+    GB.callCallback(callback, _.has(storage.users, userId));
   };
 };
 var p = new P();
 
 var inMemoryPersistence = module.exports = {
-  setHashingFunction: function(handler) {
+  setHashingFunction: function(handler, callback) {
     GB.requiredArguments(handler);
 
     hashingFunction = handler;
+
+    GB.callCallback(callback);
   },
-  isUsernameAvailable: function(username) {
+  isUsernameAvailable: function(username, callback) {
     GB.requiredArguments(username);
 
-    return !p.usernameExists(username);
+    p.usernameExists(username, function(usernameExists) {
+      GB.callCallback(callback, !usernameExists);      
+    });
   },
-  setUser: function(userId, username) {
+  setUser: function(userId, username, callback) {
     GB.requiredArguments(username);
     GB.requiredVariables(hashingFunction);
 
     // lazy creation of userId
-    userId = GB.optional(userId, p.autoId(storage.users, 'user'));
-    // ...and therewith user
-    storage.users[userId] = username;
+    p.autoId(storage.users, 'user', undefined, function(generatedId) {
+      userId = GB.optional(userId, generatedId);
+      // ...and therewith user
+      storage.users[userId] = username;  
 
-    return userId;
+      GB.callCallback(callback, userId);
+    });
   },
-  getUsername: function(userId) {
+  getUsername: function(userId, callback) {
     GB.requiredArguments(userId);
-    p.verifyUser(userId);
-
-    return storage.users[userId];
-  },
-  getUserCount: function() {
-    return _.size(storage.users);
-  },
-  getChatStats: function(userId, chatId) {
-    GB.requiredArguments(userId, chatId);
-    p.verifyUser(userId);
-    var representationalChat = p.lazyChat(chatId, userId);
-
-    var stats = new ttypes.ChatStats({
-      messageCount: _.count(representationalChat.messages),
-      participantCount: _.count(representationalChat.participants),
+    p.verifyUser(userId, function() {
+      GB.callCallback(callback, storage.users[userId]);      
     });
-
-    return stats;
   },
-  getChatMeta: function(userId, chatId) {
+  getUserCount: function(callback) {
+    GB.callCallback(callback, _.size(storage.users));
+  },
+  getChatStats: function(userId, chatId, callback) {
     GB.requiredArguments(userId, chatId);
-    p.verifyUser(userId);
-    var representationalChat = p.lazyChat(chatId, userId);
+    p.verifyUser(userId, function() {
+      p.lazyChat(chatId, userId, undefined, function(representationalChat) {
+        var stats = new ttypes.ChatStats({
+          messageCount: _.count(representationalChat.messages),
+          participantCount: _.count(representationalChat.participants),
+        });
 
-    var meta = ttypes.ChatMeta({
-      owner: representationalChat.meta.owner,
-      dateCreated: representationalChat.meta.dateCreated,
-      name: representationalChat.meta.name,
-      topic: representationalChat.meta.topic
+        GB.callCallback(callback, stats);
+      });
     });
-
-    return meta;
   },
-  setChatOptions: function(userId, chatId, chatOptions) {
+  getChatMeta: function(userId, chatId, callback) {
+    GB.requiredArguments(userId, chatId);
+    p.verifyUser(userId, function() {
+      p.lazyChat(chatId, userId, undefined, function(representationalChat) {
+        var meta = ttypes.ChatMeta({
+          owner: representationalChat.meta.owner,
+          dateCreated: representationalChat.meta.dateCreated,
+          name: representationalChat.meta.name,
+          topic: representationalChat.meta.topic
+        });
+
+        GB.callCallback(callback, meta);
+      });
+    });
+  },
+  setChatOptions: function(userId, chatId, chatOptions, callback) {
     GB.requiredArguments(userId, chatOptions);
-    p.verifyUser(userId);
-    var representationalChat = p.lazyChat(chatId, userId, chatOptions);
+    p.verifyUser(userId, function() {
+      p.lazyChat(chatId, userId, chatOptions, function(representationalChat) {
+        // commit the meta fields if they've been set
+        var rawChat = storage.chats[representationalChat.id];
+        if (!_.isUndefined(chatOptions.name)) rawChat.meta.name = chatOptions.name;
+        if (!_.isUndefined(chatOptions.topic)) rawChat.meta.topic = chatOptions.topic;
 
-    // commit the meta fields if they've been set
-    var rawChat = storage.chats[representationalChat.id];
-    if (!_.isUndefined(chatOptions.name)) rawChat.meta.name = chatOptions.name;
-    if (!_.isUndefined(chatOptions.topic)) rawChat.meta.topic = chatOptions.topic;
+        // convert it to the correct type
+        var chat = new ttypes.Chat({
+          id: representationalChat.id, 
+          meta: new ttypes.ChatMeta({
+            owner: representationalChat.meta.owner, 
+            dateCreated: representationalChat.meta.dateCreated, 
+            name: representationalChat.meta.name, 
+            topic: representationalChat.meta.topic
+          }), 
+          stats: new ttypes.ChatStats({
+            participantCount: _.size(representationalChat.participants), 
+            messageCount: _.size(representationalChat.messages)
+          })
+        });
 
-    // convert it to the correct type
-    var chat = new ttypes.Chat({
-      id: representationalChat.id, 
-      meta: new ttypes.ChatMeta({
-        owner: representationalChat.meta.owner, 
-        dateCreated: representationalChat.meta.dateCreated, 
-        name: representationalChat.meta.name, 
-        topic: representationalChat.meta.topic
-      }), 
-      stats: new ttypes.ChatStats({
-        participantCount: _.size(representationalChat.participants), 
-        messageCount: _.size(representationalChat.messages)
-      })
+        GB.callCallback(callback, chat);
+      });
     });
-
-    return chat;
   },
-  getChat: function(userId, chatId) {
+  getChat: function(userId, chatId, callback) {
     GB.requiredArguments(userId, chatId);
-    p.verifyUser(userId);
-    var representationalChat = p.lazyChat(chatId, userId);
+    p.verifyUser(userId, function() {
+      p.lazyChat(chatId, userId, undefined, function(representationalChat) {
+        // convert it to the correct type
+        var chat = new ttypes.Chat({
+          id: representationalChat.id, 
+          meta: new ttypes.ChatMeta({
+            owner: representationalChat.meta.owner, 
+            dateCreated: representationalChat.meta.dateCreated, 
+            name: representationalChat.meta.name, 
+            topic: representationalChat.meta.topic
+          }), 
+          stats: new ttypes.ChatStats({
+            participantCount: _.size(representationalChat.participants), 
+            messageCount: _.size(representationalChat.messages)
+          })
+        });
 
-    // convert it to the correct type
-    var chat = new ttypes.Chat({
-      id: representationalChat.id, 
-      meta: new ttypes.ChatMeta({
-        owner: representationalChat.meta.owner, 
-        dateCreated: representationalChat.meta.dateCreated, 
-        name: representationalChat.meta.name, 
-        topic: representationalChat.meta.topic
-      }), 
-      stats: new ttypes.ChatStats({
-        participantCount: _.size(representationalChat.participants), 
-        messageCount: _.size(representationalChat.messages)
-      })
+        GB.callCallback(callback, chat);
+      });
     });
-
-    return chat;
   },
-  getChats: function(sorting, range) {
+  getChats: function(sorting, range, callback) {
     GB.requiredArguments(sorting, range);
 
     // prune the raw chat first to get only what we want out, we do it now because the elements will be copied and this saves memory
@@ -254,62 +268,67 @@ var inMemoryPersistence = module.exports = {
     });
 
     // convert the range into something JS understands
-    var slice = p.sliceForRange(chats, range);
+    p.sliceForRange(chats, range, function(slice) {
+      // get the correct slice
+      chats = chats.slice(slice.begin, slice.end);
 
-    // get the correct slice
-    chats = chats.slice(slice.begin, slice.end);
+      // potentially reverse the chats
+      if (range.direction === ttypes.RangeDirection.BACKWARDS) chats.reverse();
 
-    // potentially reverse the chats
-    if (range.direction === ttypes.RangeDirection.BACKWARDS) chats.reverse();
+      //return chats, they're already in the correct format
+      GB.callCallback(callback, chats);
 
-    //return chats, they're already in the correct format
-    return chats;
+    });
   },
-  newMessage: function(userId, chatId, content) {
+  newMessage: function(userId, chatId, content, callback) {
     GB.requiredArguments(userId, chatId, content);
-    p.verifyUser(userId);
-    var representationalChat = p.lazyChat(chatId, userId);
+    p.verifyUser(userId, function() {
+      p.lazyChat(chatId, userId, undefined, function(representationalChat) {
+        var rawChat = storage.chats[representationalChat.id];
 
-    var rawChat = storage.chats[representationalChat.id];
+        var rawMessage = {
+          dateCreated: GB.getCurrentISODate(),
+          authorId: userId,
+          content: content,
+        };
 
-    var rawMessage = {
-      dateCreated: GB.getCurrentISODate(),
-      authorId: userId,
-      content: content,
-    };
+        // insert message
+        rawChat.messages.push(rawMessage);
+        // insert participant
+        if (!_.contains(rawChat.participants, userId)) rawChat.participants.push(userId);
 
-    // insert message
-    rawChat.messages.push(rawMessage);
-    // insert participant
-    if (!_.contains(rawChat.participants, userId)) rawChat.participants.push(userId);
+        GB.callCallback(callback);
+      });  
+    });
   },
-  getMessages: function(userId, chatId, range) {
+  getMessages: function(userId, chatId, range, callback) {
     GB.requiredArguments(userId, chatId, range);
-    p.verifyUser(userId);
-    var representationalChat = p.lazyChat(chatId, userId);
+    p.verifyUser(userId, function() {
+      p.lazyChat(chatId, userId, undefined, function(representationalChat) {
+        // convert the range into something JS understands
+        p.sliceForRange(representationalChat.messages, range, function(slice) {
+          // get the messages out
+          var rawMessages = representationalChat.messages.slice(slice.begin, slice.end);
 
-    // convert the range into something JS understands
-    var slice = p.sliceForRange(representationalChat.messages, range);
+          // convert rawMessages into Message objects
+          var messages = _.map(rawMessages, function(rawMessage, index) {
+            // get the name of the author
+            var authorName = storage.users[rawMessage.authorId];
 
-    // get the messages out
-    var rawMessages = representationalChat.messages.slice(slice.begin, slice.end);
+            return new ttypes.Message({
+              seq: slice.begin + index, 
+              dateCreated: rawMessage.dateCreated, 
+              authorName: authorName,
+              content: rawMessage.content
+            });
+          });
 
-    // convert rawMessages into Message objects
-    var messages = _.map(rawMessages, function(rawMessage, index) {
-      // get the name of the author
-      var authorName = storage.users[rawMessage.authorId];
+          // potentially reverse the messages
+          if (range.direction === ttypes.RangeDirection.BACKWARDS) messages.reverse();
 
-      return new ttypes.Message({
-        seq: slice.begin + index, 
-        dateCreated: rawMessage.dateCreated, 
-        authorName: authorName,
-        content: rawMessage.content
+          GB.callCallback(callback, messages);
+        });
       });
     });
-
-    // potentially reverse the messages
-    if (range.direction === ttypes.RangeDirection.BACKWARDS) messages.reverse();
-
-    return messages;
   }
 };

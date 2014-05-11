@@ -1,10 +1,13 @@
 {
 	"PORT": 56475,
 	"PERSISTENCE": {
-		"type": "inMemory",
-		"options": {}
+		"type": "MongoDB",
+		"options": { 
+			"url": "mongodb://localhost:27017/chat"
+		}
 	},
 	"HASHING_SALT": "magic",
+	"ID_HASHING_ENABLED": false,
 	"DEFAULT_CHAT_NAME": null,
 	"LOG_CALLS": true,
 	"LOG_OUTPUT": true,

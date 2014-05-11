@@ -8,6 +8,7 @@
 
 //lm think about potentially versioning the API calls explicitly
 //lm might need to add a different message type like "status" to enable things like "luka change the room topic to 'blabla'"
+//lm clean up the requires, right now it breaks LoD
 
 // npm modules
 var thrift = require('thrift');
@@ -39,8 +40,12 @@ errors.setShouldLogErrors(nconf.get('LOG_ERRORS'));
 var persistence = require('./persistence/' + nconf.get('PERSISTENCE').type);
 persistence.setHashingFunction(function(input) {
   var hashInput = input.toString() + nconf.get('HASHING_SALT');
-  return hashInput;//lm testing, kill
-  return crypto.createHash('sha1').update(hashInput).digest('hex');
+  if (nconf.get('ID_HASHING_ENABLED')) {
+    return crypto.createHash('sha1').update(hashInput).digest('hex');
+  }
+  else {
+    return hashInput;
+  }
 });
 
 // Server implementation
@@ -58,70 +63,35 @@ var api = {
    */
 
   isUsernameAvailable: function(username, result) {
-    var isUsernameAvailable = persistence.isUsernameAvailable(username);
-
-    result(isUsernameAvailable);
+    persistence.isUsernameAvailable(username, result);
   },
   registerUsername: function(userId, username, result) {
-    var registeredUserId = persistence.setUser(userId, username);
-
-    result(registeredUserId);
+    persistence.setUser(userId, username, result);
   },
   setChatOptions: function(userId, chatId, chatOptions, result) {
     chatOptions = GB.optional(chatOptions, {});
     chatOptions.name = GB.optional(chatOptions.name, nconf.get('DEFAULT_CHAT_NAME'));
 
-    var chat = persistence.setChatOptions(userId, chatId, chatOptions);
-
-    result(chat);
+    persistence.setChatOptions(userId, chatId, chatOptions, result);
   },
   chats: function(sorting, range, result) {
-    var chats = persistence.getChats(sorting, range);
-
-    result(chats);
+    persistence.getChats(sorting, range, result);
   },
   chat: function(userId, chatId, result) {
-    var chat = persistence.getChat(userId, chatId);
-
-    result(chat);
+    persistence.getChat(userId, chatId, result);
   },
   newMessage: function(userId, chatId, content, result) {
-    persistence.newMessage(userId, chatId, content);
-
-    result();
+    persistence.newMessage(userId, chatId, content, result);
   },
   messages: function(userId, chatId, range, result) {
-    var messages = persistence.getMessages(userId, chatId, range);
-
-    result(messages);
+    persistence.getMessages(userId, chatId, range, result);
   },
   globalUserCount: function(result) {
-    var globalUserCount = persistence.getUserCount();
-
-    result(globalUserCount);
+    persistence.getUserCount(result);
   },
 };
-api.newChat = api.setChatOptions;//the implementation is identical to setChatOptions so it's implemented as an alias
+api.newChat = api.setChatOptions;// the implementation is identical to setChatOptions so it's implemented as an alias
 
 // Start server
 thrift.createServer(GBChatService, errors.errorHandledAPI(api)).listen(nconf.get('PORT'));
 console.log("Server started on port " + nconf.get('PORT'));
-
-//need to clean up the requires, right now it breaks LoD
-
-/*
-gonna need:
-
-database:
-list of usernames
-list of chats
-list of messages
-
-function:
-way to generate unique userid
-
-pluggable back end:
-in-memory
-redis
-
-*/

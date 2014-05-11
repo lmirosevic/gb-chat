@@ -18,12 +18,18 @@ var resultLogger = function(err, result) {
 };
 
 // client.alive(resultLogger);
-// client.isUsernameAvailable("luka", resultLogger);
-client.registerUsername(null, "luka", function(err, result) {
-  var userId = result;
+client.isUsernameAvailable("536f6d7ccbf1447e94227335", function(err, result) {
   resultLogger.apply(this, arguments);
 
-  client.newChat(userId, null, new ttypes.ChatOptions({name: "luka's chat", topic: "all about dogs"}), resultLogger);
+  var isUsernameAvailable = result;
+
+  // if (isUsernameAvailable) {
+  //   client.registerUsername(null, "luka", function(err, result) {
+  //     resultLogger.apply(this, arguments);
+
+  //     var userId = result;
+
+  //     // client.newChat(userId, null, new ttypes.ChatOptions({name: "luka's chat", topic: "all about dogs"}), resultLogger);
+  //   });
+  // }
 });
-
-
