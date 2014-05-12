@@ -28,17 +28,17 @@ var userSchema = new mongoose.Schema({
 
 var chatSchema = new mongoose.Schema({
   mId:                                    { type: String, index: { unique: true } },
-  owner:                                  { type: mongoose.Schema.ObjectId },
   meta: {
+    ownerId:                              { type: String },
     dateCreated:                          { type: String, index: true },
     name:                                 { type: String },
     topic:                                { type: String },
   },
   participantIds:                         [{ type: String }],
   messages: [{
+    authorId:                             { type: String },
     dateCreated:                          { type: String },
     content:                              { type: String },
-    authorName:                           { type: String },
   }],
   messageCount:                           { type: Number },
 }, {
@@ -52,18 +52,18 @@ var Chat = mongoose.model('Chat', chatSchema);
 
 /* Error handling */
 
-//lm sort this out
-// mongoose.connection.on('error', function(error) {
+// //lm sort this out
+// mongoose.connection.on('error', function(err) {
 //   console.log('here here');
-//   console.log(error);
+//   console.log(err);
 // });
-// User.on('error', function(error) {
+// User.on('error', function(err) {
 //   console.log('userwoops');
-//   console.log(error);
+//   console.log(err);
 // });
-// Chat.on('error', function(error) {
+// Chat.on('error', function(err) {
 //   console.log('chatwoops');
-//   console.log(error);
+//   console.log(err);
 // });
 
 /* Connect */
@@ -79,8 +79,8 @@ var P = function() {
     return candidate;
   };
 
-  this.lazyChat = function(chatId, owner, chatOptions, callback) {
-    GB.requiredArguments(owner);
+  this.lazyChat = function(chatId, ownerId, chatOptions, callback) {
+    GB.requiredArguments(ownerId);
 
     chatOptions = GB.optional(chatOptions, {});
     
@@ -92,7 +92,7 @@ var P = function() {
     setOnInsertObject.participantIds = [];
     setOnInsertObject.messages = [];
     setOnInsertObject.messageCount = 0;
-    setOnInsertObject['meta.owner'] = owner;
+    setOnInsertObject['meta.ownerId'] = ownerId;
     setOnInsertObject['meta.dateCreated'] = GB.getCurrentISODate();
     if (_.isUndefined(chatOptions.name)) setOnInsertObject['meta.name'] = nconf.get('DEFAULT_CHAT_NAME');
 
@@ -178,10 +178,8 @@ var P = function() {
           })
           .project({
             mId: '$_id.mId',
-            stats: {
-              messageCount: '$_id.messageCount',
-              participantCount: '$participantCount',
-            }
+            messageCount: '$_id.messageCount',
+            participantCount: '$participantCount',
           })
           .exec()
           .then(function(results) {
@@ -190,8 +188,8 @@ var P = function() {
             });
 
             var stats = new ttypes.ChatStats({
-              messageCount: processedChat.stats.messageCount,
-              participantCount: processedChat.stats.participantCount,
+              messageCount: processedChat.messageCount,
+              participantCount: processedChat.participantCount,
             });
 
             GB.callCallback(callback, stats);
@@ -214,7 +212,7 @@ var P = function() {
           .exec()
           .then(function(rawChat){
             var meta = new ttypes.ChatMeta({
-              owner: rawChat.meta.owner,
+              ownerId: rawChat.meta.ownerId,
               dateCreated: rawChat.meta.dateCreated,
               name: rawChat.meta.name,
               topic: rawChat.meta.topic
@@ -290,6 +288,10 @@ var inMemoryPersistence = module.exports = {
       .then(function() {
         GB.callCallback(callback, userId);
       })
+      .then(undefined, function(err) {
+        console.log('err');
+        console.log(err);
+      })
       .end();
   },
   getUsername: function(userId, callback) {
@@ -334,56 +336,66 @@ var inMemoryPersistence = module.exports = {
     var sortKey;
     switch (sorting) {
       case ttypes.ChatSorting.PARTICIPANT_COUNT: {
-        sortKey = 'stats.participantCount';
+        sortKey = 'participantCount';
       } break;
 
       case ttypes.ChatSorting.MESSAGE_COUNT: {
-        sortKey = 'stats.messageCount';
+        sortKey = '_id.messageCount';
       } break;
 
       case ttypes.ChatSorting.DATE_CREATED: {
-        sortKey = 'meta.dateCreated';
+        sortKey = '_id.meta.dateCreated';
       } break;
     }
 
     // potentially reverse the chats... by prepending a minus to the sortKey
     if (range.direction === ttypes.RangeDirection.BACKWARDS) sortKey = "-" + sortKey;
 
-    //lm fix this, look at how I do it in the other aggregation example
+    // calculate the offset
+    var skip = slice.skip >= 0 ? slice.skip : -1 - slice.skip;
+
     Chat
       .aggregate()
       .group({ 
-        _id: '$mId',
-        // meta: '$meta',
-        // stats: { 
-          // messageCount: '$stats.messageCount',
-          participantCount: { $sum: { $size: '$participantIds' } },
-        // }
+        _id: {
+          mId: '$mId',
+          messageCount: '$messageCount',
+          meta: '$meta'
+        },
+        participantCount: { $sum: { $size: '$participantIds' } },
       })
       .sort(sortKey)
-      .skip(Math.abs(slice.skip))
+      .skip(skip)
       .limit(slice.limit)
+      .project({
+        _id: 0,
+        mId: '$_id.mId',
+        meta: '$_id.meta',
+        messageCount: '$_id.messageCount',
+        participantCount: '$participantCount',
+      })
       .exec()
-      .then(function(rawChats) {
-        var chats = _.map(rawChats, function(rawChat) {
+      .then(function(results) {
+        var chats = _.map(results, function(rawChat) {
           return new ttypes.Chat({
-            id: rawChat.id,
+            id: rawChat.mId,
             meta: new ttypes.ChatMeta({
-              owner: rawChat.meta.owner,
+              ownerId: rawChat.meta.ownerId,
               dateCreated: rawChat.meta.dateCreated,
               name: rawChat.meta.name,
               topic: rawChat.meta.topic
             }), 
             stats: new ttypes.ChatStats({
-              participantCount: rawChat.stats.participantCount,
-              messageCount: rawChat.stats.messageCount,
+              participantCount: rawChat.participantCount,
+              messageCount: rawChat.messageCount,
             }),
           });
         });
 
         GB.callCallback(callback, chats);
       })
-      .then(null, function(err) {
+      .then(undefined, function(err) {
+        console.log('err');
         console.log(err);
       })
       .end();
@@ -395,8 +407,8 @@ var inMemoryPersistence = module.exports = {
       p.lazyChat(chatId, userId, undefined, function(chatId) {
 
       var rawMessage = {
-        dateCreated: GB.getCurrentISODate(),
         authorId: userId,
+        dateCreated: GB.getCurrentISODate(),
         content: content,
       };
 
@@ -410,16 +422,20 @@ var inMemoryPersistence = module.exports = {
           },
           // increment messageCount
           $inc: {
-            'stats.messageCount': 1
+            'messageCount': 1
           },
-          // insert participants
+          // insert participantIds
           $addToSet: {
-            participants: userId,
+            participantIds: userId,
           },
         })
         .exec()
-        .then(function(out) {
+        .then(function() {
           GB.callCallback(callback);
+        })
+        .then(undefined, function(err) {
+          console.log('err');
+          console.log(err);
         })
         .end();
       });  
@@ -438,7 +454,7 @@ var inMemoryPersistence = module.exports = {
             mId: chatId
           })
           .where('messages').slice([slice.skip, slice.limit])
-          .select('messages stats.messageCount')
+          .select('messages messageCount')
           .exec()
           .then(function(rawChat) {
             // get author names
@@ -459,7 +475,7 @@ var inMemoryPersistence = module.exports = {
                 // convert raw messages into Message objects
                 var messages = _.map(rawChat.messages, function(rawMessage, index) {
                   // process the tricky fields
-                  var seq = ((range.direction === ttypes.RangeDirection.FORWARDS) ? 0 : rawChat.stats.messageCount) + slice.begin + index;
+                  var seq = ((range.direction === ttypes.RangeDirection.FORWARDS) ? 0 : rawChat.messageCount - 1) + slice.skip + index;
                   var authorName = usernameMap[rawMessage.authorId];
 
                   return new ttypes.Message({
