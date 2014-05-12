@@ -45,7 +45,7 @@ struct ChatStats {
 }
 
 struct ChatMeta {
-    1: string owner,
+    1: string ownerId,
     2: string dateCreated,
     3: string name,
     4: string topic,

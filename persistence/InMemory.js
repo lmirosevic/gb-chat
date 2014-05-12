@@ -46,8 +46,8 @@ var P = function() {
     }
   };
 
-  this.lazyChat = function(chatId, owner, chatOptions, callback) {
-    GB.requiredArguments(owner);
+  this.lazyChat = function(chatId, ownerId, chatOptions, callback) {
+    GB.requiredArguments(ownerId);
     chatOptions = GB.optional(chatOptions, {});
     
     // attempt to get existing chat
@@ -60,7 +60,7 @@ var P = function() {
       // initialize it
       rawChat = {
         meta: {
-          owner: owner,
+          ownerId: ownerId,
           dateCreated: GB.getCurrentISODate(),
           name: GB.optional(chatOptions.name, nconf.get('DEFAULT_CHAT_NAME')),
           topic: GB.optional(chatOptions.topic, null),
@@ -142,7 +142,7 @@ var P = function() {
         var storedChat = storage.chats[chatId];
 
         var meta = new ttypes.ChatMeta({
-          owner: storedChat.meta.owner,
+          ownerId: storedChat.meta.ownerId,
           dateCreated: storedChat.meta.dateCreated,
           name: storedChat.meta.name,
           topic: storedChat.meta.topic,
@@ -220,7 +220,7 @@ var inMemoryPersistence = module.exports = {
       return new ttypes.Chat({
         id: chatId, 
         meta: new ttypes.ChatMeta({
-          owner: representationalChat.meta.owner, 
+          ownerId: representationalChat.meta.ownerId,
           dateCreated: representationalChat.meta.dateCreated, 
           name: representationalChat.meta.name, 
           topic: representationalChat.meta.topic
