@@ -10,20 +10,12 @@
 //lm might need to add a different message type like "status" to enable things like "luka change the room topic to 'blabla'"
 //lm clean up the requires, right now it breaks LoD
 
-// npm modules
-var thrift = require('thrift'),
+var _ = require('underscore'),
     nconf = require('nconf'),
-    _ = require('underscore');
-
-// standard library
-var crypto = require('crypto');
-
-// vendored libs
-var GB = require('./lib/Goonbee/toolbox'),
-    errors = require('./lib/Chat/errors');
-
-// app specific
-var GBChatService = require('./gen-nodejs/GoonbeeChatService'),
+    thrift = require('thrift'),
+    GB = require('./lib/Goonbee/toolbox'),
+    errors = require('./lib/Chat/errors'),
+    GBChatService = require('./gen-nodejs/GoonbeeChatService'),
     ttypes = require('./gen-nodejs/GoonbeeChatService_types');
 
 
@@ -38,16 +30,6 @@ errors.setShouldLogErrors(nconf.get('LOG_ERRORS'));
 
 // Persistence layer
 var persistence = require('./persistence/' + nconf.get('PERSISTENCE').type);
-persistence.setHashingFunction(function(input) {
-  var hashInput = input.toString() + nconf.get('HASHING_SALT');
-  if (nconf.get('ID_HASHING_ENABLED')) {
-    return crypto.createHash('sha1').update(hashInput).digest('hex');
-  }
-  else {
-    return hashInput;
-  }
-});
-//lm change this hashing function so it's internal to the implementation, this is bad because it depends on the feature to be able to atomically get count of a field and subsequently set it, which is not exactly supported
 
 // Server implementation
 var api = {

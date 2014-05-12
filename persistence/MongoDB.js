@@ -13,10 +13,11 @@ var _ = require('underscore'),
     errors = require('../lib/Chat/errors'),//lm sort out this require, it's nasty
     ttypes = require('../gen-nodejs/GoonbeeChatService_types');
 
+var options = nconf.get('PERSISTENCE').options;
 
 /* Mongoose Setup and Schema */
 
-mongoose.connect(nconf.get('PERSISTENCE').options.url);
+mongoose.connect(options.url);
 
 var userSchema = new mongoose.Schema({
   mId:                                    { type: String, index: { unique: true } },

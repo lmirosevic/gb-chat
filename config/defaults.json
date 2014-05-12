@@ -3,11 +3,11 @@
 	"PERSISTENCE": {
 		"type": "InMemory",
 		"options": { 
-			"url": "mongodb://localhost:27017/chat"
+			"url": "mongodb://localhost:27017/chat",
+			"idHashingEnabled": true,
+			"hashingSalt": "magic"
 		}
 	},
-	"HASHING_SALT": "magic",
-	"ID_HASHING_ENABLED": false,
 	"DEFAULT_CHAT_NAME": null,
 	"LOG_CALLS": true,
 	"LOG_OUTPUT": true,

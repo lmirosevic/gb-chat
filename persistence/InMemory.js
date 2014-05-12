@@ -6,25 +6,38 @@
 //  Copyright (c) 2014 Goonbee. All rights reserved.
 //
 
-var _ = require('underscore'),
+var crypto = require('crypto'),
+    _ = require('underscore'),
+    nconf = require('nconf'),
     GB = require('../lib/Goonbee/toolbox'),
     errors = require('../lib/Chat/errors'),//lm sort out this require, it's nasty
     ttypes = require('../gen-nodejs/GoonbeeChatService_types');
+
+var options = nconf.get('PERSISTENCE').options;
 
 var storage = {
   users: {},
   chats: {}
 };
-var hashingFunction;
 
 var P = function() {
+  this.hashingFunction = function(input) {
+    var hashInput = input.toString() + options.hashingSalt;
+    if (options.idHashingEnabled) {
+      return crypto.createHash('sha1').update(hashInput).digest('hex');
+    }
+    else {
+      return hashInput;
+    }
+  };
+
   this.autoId_s = function(field, prefix, offset) {
     GB.requiredArguments(field);
-    GB.requiredVariables(hashingFunction);
+    GB.requiredVariables(p.hashingFunction);
     offset = GB.optional(offset, 0);
 
     var itemCount = _.size(field) + offset;
-    var candidate = hashingFunction(prefix + itemCount.toString());
+    var candidate = p.hashingFunction(prefix + itemCount.toString());
     if (_.contains(field, candidate)) {
       return this(field, prefix, offset + 1);
     }
@@ -164,13 +177,6 @@ var P = function() {
 var p = new P();
 
 var inMemoryPersistence = module.exports = {
-  setHashingFunction: function(handler, callback) {
-    GB.requiredArguments(handler);
-
-    hashingFunction = handler;
-
-    GB.callCallback(callback);
-  },
   isUsernameAvailable: function(username, callback) {
     GB.requiredArguments(username);
 
