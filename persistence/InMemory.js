@@ -99,6 +99,71 @@ var P = function() {
 
     GB.callCallback(callback, _.has(storage.users, userId));
   };
+
+  this.setChatOptions = function(userId, chatId, chatOptions, callback) {
+    GB.requiredArguments(userId);
+
+    chatOptions = GB.optional(chatOptions, {});
+
+    p.verifyUser(userId, function() {
+      p.lazyChat(chatId, userId, chatOptions, function(chatId) {
+        var storedChat = storage.chats[chatId];
+
+        // commit the meta fields if they've been set
+        if (!_.isUndefined(chatOptions.name)) storedChat.meta.name = chatOptions.name;
+        if (!_.isUndefined(chatOptions.topic)) storedChat.meta.topic = chatOptions.topic;
+
+        p.getChatStats(userId, chatId, function(stats) {
+          p.getChatMeta(userId, chatId, function(meta) {
+            var chat = new ttypes.Chat({
+              id: chatId, 
+              meta: meta, 
+              stats: stats,
+            });
+
+            GB.callCallback(callback, chat);
+          });
+        });
+      });
+    });
+  };
+
+  this.getChatStats = function(userId, chatId, callback) {
+    GB.requiredArguments(userId, chatId);
+
+    p.verifyUser(userId, function() {
+      p.lazyChat(chatId, userId, undefined, function(chatId) {
+        var storedChat = storage.chats[chatId];
+
+        var stats = new ttypes.ChatStats({
+          messageCount: _.size(storedChat.messages),
+          participantCount: _.size(storedChat.participants),
+        });
+
+        GB.callCallback(callback, stats);
+      });
+    });
+  };
+
+  this.getChatMeta = function(userId, chatId, callback) {
+    GB.requiredArguments(userId, chatId);
+
+    p.verifyUser(userId, function() {
+      p.lazyChat(chatId, userId, undefined, function(chatId) {
+        var storedChat = storage.chats[chatId];
+
+        var meta = new ttypes.ChatMeta({
+          owner: storedChat.meta.owner,
+          dateCreated: storedChat.meta.dateCreated,
+          name: storedChat.meta.name,
+          topic: storedChat.meta.topic,
+        });
+
+        GB.callCallback(callback, meta);
+      });
+    });
+  };
+
 };
 var p = new P();
 
@@ -129,6 +194,7 @@ var inMemoryPersistence = module.exports = {
   },
   getUsername: function(userId, callback) {
     GB.requiredArguments(userId);
+
     p.verifyUser(userId, function() {
       GB.callCallback(callback, storage.users[userId]);      
     });
@@ -136,91 +202,13 @@ var inMemoryPersistence = module.exports = {
   getUserCount: function(callback) {
     GB.callCallback(callback, _.size(storage.users));
   },
-  getChatStats: function(userId, chatId, callback) {
-    GB.requiredArguments(userId, chatId);
-    p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(chatId) {
-        var storedChat = storage.chats[chatId];
-
-        var stats = new ttypes.ChatStats({
-          messageCount: _.count(storedChat.messages),
-          participantCount: _.count(storedChat.participants),
-        });
-
-        GB.callCallback(callback, stats);
-      });
-    });
-  },
-  getChatMeta: function(userId, chatId, callback) {
-    GB.requiredArguments(userId, chatId);
-    p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(chatId) {
-        var storedChat = storage.chats[chatId];
-
-        var meta = new ttypes.ChatMeta({
-          owner: storedChat.meta.owner,
-          dateCreated: storedChat.meta.dateCreated,
-          name: storedChat.meta.name,
-          topic: storedChat.meta.topic
-        });
-
-        GB.callCallback(callback, meta);
-      });
-    });
-  },
-  setChatOptions: function(userId, chatId, chatOptions, callback) {
-    GB.requiredArguments(userId, chatOptions);
-    p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(chatId) {
-        var storedChat = storage.chats[chatId];
-
-        // commit the meta fields if they've been set
-        if (!_.isUndefined(chatOptions.name)) storedChat.meta.name = chatOptions.name;
-        if (!_.isUndefined(chatOptions.topic)) storedChat.meta.topic = chatOptions.topic;
-
-        // convert it to the correct type
-        var chat = new ttypes.Chat({
-          id: chatId, 
-          meta: new ttypes.ChatMeta({
-            owner: storedChat.meta.owner, 
-            dateCreated: storedChat.meta.dateCreated, 
-            name: storedChat.meta.name, 
-            topic: storedChat.meta.topic
-          }), 
-          stats: new ttypes.ChatStats({
-            participantCount: _.size(storedChat.participants), 
-            messageCount: _.size(storedChat.messages)
-          })
-        });
-
-        GB.callCallback(callback, chat);
-      });
-    });
-  },
+  getChatStats: p.getChatStats,
+  getChatMeta: p.getChatMeta,
+  setChatOptions: p.setChatOptions,
   getChat: function(userId, chatId, callback) {
-    GB.requiredArguments(userId, chatId);
-    p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(chatId) {
-        var storedChat = storage.chats[chatId];
-        
-        // convert it to the correct type
-        var chat = new ttypes.Chat({
-          id: chatId, 
-          meta: new ttypes.ChatMeta({
-            owner: storedChat.meta.owner, 
-            dateCreated: storedChat.meta.dateCreated, 
-            name: storedChat.meta.name, 
-            topic: storedChat.meta.topic
-          }), 
-          stats: new ttypes.ChatStats({
-            participantCount: _.size(storedChat.participants), 
-            messageCount: _.size(storedChat.messages)
-          })
-        });
+    GB.requiredArguments(userId);
 
-        GB.callCallback(callback, chat);
-      });
-    });
+    p.setChatOptions(userId, chatId, undefined, callback);
   },
   getChats: function(sorting, range, callback) {
     GB.requiredArguments(sorting, range);
@@ -273,6 +261,7 @@ var inMemoryPersistence = module.exports = {
   },
   newMessage: function(userId, chatId, content, callback) {
     GB.requiredArguments(userId, chatId, content);
+
     p.verifyUser(userId, function() {
       p.lazyChat(chatId, userId, undefined, function(chatId) {
         var storedChat = storage.chats[chatId];
@@ -294,6 +283,7 @@ var inMemoryPersistence = module.exports = {
   },
   getMessages: function(userId, chatId, range, callback) {
     GB.requiredArguments(userId, chatId, range);
+
     p.verifyUser(userId, function() {
       p.lazyChat(chatId, userId, undefined, function(chatId) {
         var storedChat = storage.chats[chatId];
