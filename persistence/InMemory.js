@@ -60,6 +60,10 @@ var P = function() {
       storage.chats[chatId] = rawChat;
     }
 
+    // commit the meta fields if they've been set
+    if (!_.isUndefined(chatOptions.name)) rawChat.meta.name = chatOptions.name;
+    if (!_.isUndefined(chatOptions.topic)) rawChat.meta.topic = chatOptions.topic;
+
     GB.callCallback(callback, chatId);
   };
 
@@ -100,34 +104,6 @@ var P = function() {
     GB.callCallback(callback, _.has(storage.users, userId));
   };
 
-  this.setChatOptions = function(userId, chatId, chatOptions, callback) {
-    GB.requiredArguments(userId);
-
-    chatOptions = GB.optional(chatOptions, {});
-
-    p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, chatOptions, function(chatId) {
-        var storedChat = storage.chats[chatId];
-
-        // commit the meta fields if they've been set
-        if (!_.isUndefined(chatOptions.name)) storedChat.meta.name = chatOptions.name;
-        if (!_.isUndefined(chatOptions.topic)) storedChat.meta.topic = chatOptions.topic;
-
-        p.getChatStats(userId, chatId, function(stats) {
-          p.getChatMeta(userId, chatId, function(meta) {
-            var chat = new ttypes.Chat({
-              id: chatId, 
-              meta: meta, 
-              stats: stats,
-            });
-
-            GB.callCallback(callback, chat);
-          });
-        });
-      });
-    });
-  };
-
   this.getChatStats = function(userId, chatId, callback) {
     GB.requiredArguments(userId, chatId);
 
@@ -160,6 +136,26 @@ var P = function() {
         });
 
         GB.callCallback(callback, meta);
+      });
+    });
+  };
+
+  this.setChatOptions = function(userId, chatId, chatOptions, callback) {
+    GB.requiredArguments(userId);
+
+    p.verifyUser(userId, function() {
+      p.lazyChat(chatId, userId, chatOptions, function(chatId) {
+        p.getChatStats(userId, chatId, function(stats) {
+          p.getChatMeta(userId, chatId, function(meta) {
+            var chat = new ttypes.Chat({
+              id: chatId,
+              meta: meta,
+              stats: stats,
+            });
+
+            GB.callCallback(callback, chat);
+          });
+        });
       });
     });
   };
