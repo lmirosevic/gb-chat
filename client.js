@@ -17,19 +17,40 @@ var resultLogger = function(err, result) {
   console.log('----------');
 };
 
-// client.alive(resultLogger);
-client.isUsernameAvailable("536f6d7ccbf1447e94227335", function(err, result) {
+// client.setChatOptions(userId, chatId, chatOptions, function(err, result) {
+//   resultLogger.apply(this, arguments);
+// });
+
+// // client.alive(resultLogger);
+client.isUsernameAvailable('luka', function(err, result) {
   resultLogger.apply(this, arguments);
 
   var isUsernameAvailable = result;
 
-  // if (isUsernameAvailable) {
-  //   client.registerUsername(null, "luka", function(err, result) {
-  //     resultLogger.apply(this, arguments);
+  if (isUsernameAvailable) {
+    client.registerUsername(null, "luka", function(err, result) {
+      resultLogger.apply(this, arguments);
 
-  //     var userId = result;
+      var userId = result;
 
-  //     // client.newChat(userId, null, new ttypes.ChatOptions({name: "luka's chat", topic: "all about dogs"}), resultLogger);
-  //   });
-  // }
+      whatToDo(userId);
+    });
+  }
+  else {
+    whatToDo('537095499b54daf88a971199');
+  }
 });
+
+//what to do with our logged in user
+var whatToDo = function(userId) {
+  client.setChatOptions(userId, 'dogchat', new ttypes.ChatOptions({name: "luka's chat", topic: "all about dogs"}), resultLogger);
+
+  // client.chats(ttypes.ChatSorting.PARTICIPANT_COUNT, new ttypes.Range({direction: ttypes.RangeDirection.FORWARDS, index: 0, length: 10}), resultLogger);
+};
+
+
+
+
+
+
+
