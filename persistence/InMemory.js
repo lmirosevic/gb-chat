@@ -18,7 +18,7 @@ var storage = {
 var hashingFunction;
 
 var P = function() {
-  this.autoId = function(field, prefix, offset, callback) {
+  this.autoId_s = function(field, prefix, offset) {
     GB.requiredArguments(field);
     GB.requiredVariables(hashingFunction);
     offset = GB.optional(offset, 0);
@@ -26,10 +26,10 @@ var P = function() {
     var itemCount = _.size(field) + offset;
     var candidate = hashingFunction(prefix + itemCount.toString());
     if (_.contains(field, candidate)) {
-      GB.callCallback(callback, this(field, prefix, offset + 1, callback));
+      return this(field, prefix, offset + 1);
     }
     else {
-      GB.callCallback(callback, candidate);
+      return candidate;
     }
   };
 
@@ -40,29 +40,27 @@ var P = function() {
     // attempt to get existing chat
     var rawChat = storage.chats[chatId];
 
-    p.autoId(storage.chats, 'chat', undefined, function(generatedId) {
-      if (_.isUndefined(rawChat)) {
-        // generate id for it if necessary
-        chatId = GB.optional(chatId, generatedId);
+    if (_.isUndefined(rawChat)) {
+      // generate id for it if necessary
+      chatId = GB.optional(chatId, p.autoId_s(storage.chats, 'chat'));
 
-        // initialize it
-        rawChat = {
-          meta: {
-            owner: owner,
-            dateCreated: GB.getCurrentISODate(),
-            name: GB.optional(chatOptions.name, null),
-            topic: GB.optional(chatOptions.topic, null),
-          },
-          participants: [],
-          messages: []
-        };
+      // initialize it
+      rawChat = {
+        meta: {
+          owner: owner,
+          dateCreated: GB.getCurrentISODate(),
+          name: GB.optional(chatOptions.name, null),
+          topic: GB.optional(chatOptions.topic, null),
+        },
+        participants: [],
+        messages: []
+      };
 
-        // commit it
-        storage.chats[chatId] = rawChat;
-      }
+      // commit it
+      storage.chats[chatId] = rawChat;
+    }
 
-      GB.callCallback(callback, chatId);
-    });
+    GB.callCallback(callback, chatId);
   };
 
   this.verifyUser = function(userId, callback) {
@@ -73,7 +71,7 @@ var P = function() {
     });
   };
   
-  this.sliceForRange = function(collection, range, callback) {
+  this.sliceForRange_s = function(collection, range) {
     var elementCount = _.size(collection);
     
     var saneIndex = GB.threshold(range.index, 0, elementCount);
@@ -93,13 +91,7 @@ var P = function() {
       } break;
     }
 
-    GB.callCallback(callback, {begin: begin, end: end});
-  };
-
-  this.usernameExists = function(username, callback) {
-    GB.requiredArguments(username);
-
-    GB.callCallback(callback, _.contains(storage.users, username));
+    return {begin: begin, end: end};
   };
 
   this.isUserIdRegistered = function(userId, callback) {
@@ -121,22 +113,19 @@ var inMemoryPersistence = module.exports = {
   isUsernameAvailable: function(username, callback) {
     GB.requiredArguments(username);
 
-    p.usernameExists(username, function(usernameExists) {
-      GB.callCallback(callback, !usernameExists);      
-    });
+    var isUsernameAvailable = !_.contains(storage.users, username);
+
+    GB.callCallback(callback, isUsernameAvailable);
   },
   setUser: function(userId, username, callback) {
     GB.requiredArguments(username);
-    GB.requiredVariables(hashingFunction);
 
     // lazy creation of userId
-    p.autoId(storage.users, 'user', undefined, function(generatedId) {
-      userId = GB.optional(userId, generatedId);
-      // ...and therewith user
-      storage.users[userId] = username;  
+    userId = GB.optional(userId, p.autoId_s(storage.users, 'user'));
+    // ...and therewith user
+    storage.users[userId] = username;  
 
-      GB.callCallback(callback, userId);
-    });
+    GB.callCallback(callback, userId);
   },
   getUsername: function(userId, callback) {
     GB.requiredArguments(userId);
@@ -168,7 +157,7 @@ var inMemoryPersistence = module.exports = {
       p.lazyChat(chatId, userId, undefined, function(chatId) {
         var storedChat = storage.chats[chatId];
 
-        var meta = ttypes.ChatMeta({
+        var meta = new ttypes.ChatMeta({
           owner: storedChat.meta.owner,
           dateCreated: storedChat.meta.dateCreated,
           name: storedChat.meta.name,
@@ -271,17 +260,16 @@ var inMemoryPersistence = module.exports = {
     });
 
     // convert the range into something JS understands
-    p.sliceForRange(chats, range, function(slice) {
-      // get the correct slice
-      chats = chats.slice(slice.begin, slice.end);
+    var slice = p.sliceForRange_s(chats, range);
 
-      // potentially reverse the chats
-      if (range.direction === ttypes.RangeDirection.BACKWARDS) chats.reverse();
+    // get the correct slice
+    chats = chats.slice(slice.begin, slice.end);
 
-      //return chats, they're already in the correct format
-      GB.callCallback(callback, chats);
+    // potentially reverse the chats
+    if (range.direction === ttypes.RangeDirection.BACKWARDS) chats.reverse();
 
-    });
+    //return chats, they're already in the correct format
+    GB.callCallback(callback, chats);
   },
   newMessage: function(userId, chatId, content, callback) {
     GB.requiredArguments(userId, chatId, content);
@@ -311,28 +299,28 @@ var inMemoryPersistence = module.exports = {
         var storedChat = storage.chats[chatId];
 
         // convert the range into something JS understands
-        p.sliceForRange(storedChat.messages, range, function(slice) {
-          // get the messages out
-          var rawMessages = storedChat.messages.slice(slice.begin, slice.end);
+        var slice = p.sliceForRange_s(storedChat.messages, range);
+          
+        // get the messages out
+        var rawMessages = storedChat.messages.slice(slice.begin, slice.end);
 
-          // convert rawMessages into Message objects
-          var messages = _.map(rawMessages, function(rawMessage, index) {
-            // get the name of the author
-            var authorName = storage.users[rawMessage.authorId];
+        // convert rawMessages into Message objects
+        var messages = _.map(rawMessages, function(rawMessage, index) {
+          // get the name of the author
+          var authorName = storage.users[rawMessage.authorId];
 
-            return new ttypes.Message({
-              seq: slice.begin + index, 
-              dateCreated: rawMessage.dateCreated, 
-              authorName: authorName,
-              content: rawMessage.content
-            });
+          return new ttypes.Message({
+            seq: slice.begin + index, 
+            dateCreated: rawMessage.dateCreated, 
+            authorName: authorName,
+            content: rawMessage.content
           });
-
-          // potentially reverse the messages
-          if (range.direction === ttypes.RangeDirection.BACKWARDS) messages.reverse();
-
-          GB.callCallback(callback, messages);
         });
+
+        // potentially reverse the messages
+        if (range.direction === ttypes.RangeDirection.BACKWARDS) messages.reverse();
+
+        GB.callCallback(callback, messages);
       });
     });
   }
