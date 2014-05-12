@@ -52,9 +52,6 @@ var api = {
     persistence.setUser(userId, username, result);
   },
   setChatOptions: function(userId, chatId, chatOptions, result) {
-    chatOptions = GB.optional(chatOptions, {});
-    chatOptions.name = GB.optional(chatOptions.name, nconf.get('DEFAULT_CHAT_NAME'));
-
     persistence.setChatOptions(userId, chatId, chatOptions, result);
   },
   chats: function(sorting, range, result) {

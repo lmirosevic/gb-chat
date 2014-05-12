@@ -62,7 +62,7 @@ var P = function() {
         meta: {
           owner: owner,
           dateCreated: GB.getCurrentISODate(),
-          name: GB.optional(chatOptions.name, null),
+          name: GB.optional(chatOptions.name, nconf.get('DEFAULT_CHAT_NAME')),
           topic: GB.optional(chatOptions.topic, null),
         },
         participants: [],

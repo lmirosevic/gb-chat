@@ -36,7 +36,6 @@ var User = mongoose.model('User', userSchema);
 var Chat = mongoose.model('Chat', chatSchema);
 
 
-console.log(new ObjectId());
 
 // var luka = new User({id: '1', username: 'luka'});
 // luka.save(function(err, user) {

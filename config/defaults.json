@@ -1,7 +1,7 @@
 {
 	"PORT": 56475,
 	"PERSISTENCE": {
-		"type": "InMemory",
+		"type": "MongoDB",
 		"options": { 
 			"url": "mongodb://localhost:27017/chat",
 			"idHashingEnabled": true,
