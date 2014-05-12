@@ -15,9 +15,9 @@ var _ = require('underscore'),
 
 var options = nconf.get('PERSISTENCE').options;
 
-/* Mongoose Setup and Schema */
+//lm sort out error handling so it doesn't crash the process
 
-mongoose.connect(options.url);
+/* Schema */
 
 var userSchema = new mongoose.Schema({
   mId:                                    { type: String, index: { unique: true } },
@@ -28,7 +28,7 @@ var userSchema = new mongoose.Schema({
 
 var chatSchema = new mongoose.Schema({
   mId:                                    { type: String, index: { unique: true } },
-  owner:                                  { type: mongoo.schema.ObjectId },
+  owner:                                  { type: mongoose.Schema.ObjectId },
   meta: {
     dateCreated:                          { type: String, index: true },
     name:                                 { type: String },
@@ -38,22 +38,43 @@ var chatSchema = new mongoose.Schema({
   messages: [{
     dateCreated:                          { type: String },
     content:                              { type: String },
-    authorName:                           { type: String }
+    authorName:                           { type: String },
   }],
+  messageCount:                           { type: Number },
 }, {
   _id: false,
 });
 
+/* Models */
+
 var User = mongoose.model('User', userSchema);
 var Chat = mongoose.model('Chat', chatSchema);
 
+/* Error handling */
+
+//lm sort this out
+// mongoose.connection.on('error', function(error) {
+//   console.log('here here');
+//   console.log(error);
+// });
+// User.on('error', function(error) {
+//   console.log('userwoops');
+//   console.log(error);
+// });
+// Chat.on('error', function(error) {
+//   console.log('chatwoops');
+//   console.log(error);
+// });
+
+/* Connect */
+
+mongoose.connect(options.url);
 
 /* Main logic */
 
 var P = function() {
   this.autoId_s = function() {
-    var cadidate = new mongoose.types.ObjectId().toString();
-    //lm make sure that this works and returns an actual string
+    var candidate = new mongoose.Types.ObjectId().toString();
 
     return candidate;
   };
@@ -66,28 +87,32 @@ var P = function() {
     // make sure we have a valid chatId
     chatId = GB.optional(chatId, p.autoId_s());
 
-    // set properties which are defined on the options, if they're undefined then we won't set them, if they're null then we will
+    // what we will set on object creation
+    var setOnInsertObject = {};
+    setOnInsertObject.participantIds = [];
+    setOnInsertObject.messages = [];
+    setOnInsertObject.messageCount = 0;
+    setOnInsertObject['meta.owner'] = owner;
+    setOnInsertObject['meta.dateCreated'] = GB.getCurrentISODate();
+    if (_.isUndefined(chatOptions.name)) setOnInsertObject['meta.name'] = nconf.get('DEFAULT_CHAT_NAME');
+
+    // some optional customisation that we do each time
     var setObject = {};
     if (!_.isUndefined(chatOptions.name)) setObject['meta.name'] = chatOptions.name;
     if (!_.isUndefined(chatOptions.topic)) setObject['meta.topic'] = chatOptions.topic;
 
+    var updateObject = {};
+    if (_.size(setOnInsertObject) > 0) updateObject.$setOnInsert = setOnInsertObject;
+    if (_.size(setObject) > 0) updateObject.$set = setObject;
+
     Chat
       .update({
         mId: chatId
-      }, {
-        $setOnInsert: {
-          'meta.owner': owner,
-          'meta.dateCreated': GB.getCurrentISODate(),
-        },
-        $set: setObject,
-      }, {
+      }, updateObject, {
         upsert: true,
       })
       .exec()
       .then(function(chat) {
-        console.log(chat);//lm kill
-
-        // return just the chatId
         GB.callCallback(callback, chatId);
       })
       .end();
@@ -137,7 +162,6 @@ var P = function() {
 
   this.getChatStats = function(userId, chatId, callback) {
     GB.requiredArguments(userId, chatId);
-
     p.verifyUser(userId, function() {
       p.lazyChat(chatId, userId, undefined, function(chatId) {
         Chat
@@ -146,15 +170,25 @@ var P = function() {
             mId: chatId
           })
           .group({ 
-            _id: $mId,
+            _id: {
+              mId: '$mId',
+              messageCount: '$messageCount',
+            },
+              participantCount: { $sum: { $size: '$participantIds' } },
+          })
+          .project({
+            mId: '$_id.mId',
             stats: {
-              messageCount: 'stats.messageCount',
-              participantCount: { $size: participants },
+              messageCount: '$_id.messageCount',
+              participantCount: '$participantCount',
             }
           })
-          .select('-id')
           .exec()
-          .then(function(processedChat) {
+          .then(function(results) {
+            var processedChat = _.find(results, function(result) {
+              return (result._id.mId === chatId);
+            });
+
             var stats = new ttypes.ChatStats({
               messageCount: processedChat.stats.messageCount,
               participantCount: processedChat.stats.participantCount,
@@ -253,10 +287,7 @@ var inMemoryPersistence = module.exports = {
         upsert: true,
       })
       .exec()
-      .then(function(user) {
-        console.log(user);//lm kill
-
-        // return just the chatId
+      .then(function() {
         GB.callCallback(callback, userId);
       })
       .end();
@@ -315,21 +346,22 @@ var inMemoryPersistence = module.exports = {
       } break;
     }
 
-    // potentially reverse the chats... by prepending a minus to the sortKey... but not sure exactly how, need to be able to test first
-    // if (range.direction === ttypes.RangeDirection.BACKWARDS) chats.reverse();
+    // potentially reverse the chats... by prepending a minus to the sortKey
+    if (range.direction === ttypes.RangeDirection.BACKWARDS) sortKey = "-" + sortKey;
 
+    //lm fix this, look at how I do it in the other aggregation example
     Chat
       .aggregate()
       .group({ 
-        _id: $mId,
-        meta: $meta,
-        stats: { 
-          messageCount: 'stats.messageCount',
-          participantCount: { $size: participants },
-        }
+        _id: '$mId',
+        // meta: '$meta',
+        // stats: { 
+          // messageCount: '$stats.messageCount',
+          participantCount: { $sum: { $size: '$participantIds' } },
+        // }
       })
       .sort(sortKey)
-      .skip(slice.skip)
+      .skip(Math.abs(slice.skip))
       .limit(slice.limit)
       .exec()
       .then(function(rawChats) {
@@ -350,6 +382,9 @@ var inMemoryPersistence = module.exports = {
         });
 
         GB.callCallback(callback, chats);
+      })
+      .then(null, function(err) {
+        console.log(err);
       })
       .end();
   },
@@ -384,9 +419,6 @@ var inMemoryPersistence = module.exports = {
         })
         .exec()
         .then(function(out) {
-          console.log(out);//lm kill
-
-          // return just the chatId
           GB.callCallback(callback);
         })
         .end();
