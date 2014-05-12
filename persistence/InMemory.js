@@ -198,9 +198,9 @@ var inMemoryPersistence = module.exports = {
   getUserCount: function(callback) {
     GB.callCallback(callback, _.size(storage.users));
   },
-  getChatStats: p.getChatStats,
-  getChatMeta: p.getChatMeta,
-  setChatOptions: p.setChatOptions,
+  getChatStats: p.getChatStats,// abstracted into private to avoid code repetition
+  getChatMeta: p.getChatMeta,// abstracted into private to avoid code repetition
+  setChatOptions: p.setChatOptions,// abstracted into private to avoid code repetition
   getChat: function(userId, chatId, callback) {
     GB.requiredArguments(userId);
 
