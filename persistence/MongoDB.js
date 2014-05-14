@@ -51,8 +51,15 @@ var Chat = mongoose.model('Chat', chatSchema);
 
 /* Connect */
 
-//lm add auto reconnecting logic
-mongoose.connect(options.url);
+mongoose.connection.on('error', function(err) {
+  // try again in a little while
+  setTimeout(connect, options.reconnectionTimeout);
+});
+var connect = function() { 
+  console.log('Attempting (re)connection to MongoDB on ' + options.url);
+  mongoose.connect(options.url, { autoReconnect: true });
+};
+connect();
 
 /* Main logic */
 
