@@ -11,11 +11,10 @@ var _ = require('underscore'),
     mongoose = require('mongoose'),
     GB = require('../lib/Goonbee/toolbox'),
     errors = require('../lib/Chat/errors'),//lm sort out this require, it's nasty
-    ttypes = require('../gen-nodejs/GoonbeeChatService_types');
+    ttypes = require('../gen-nodejs/GoonbeeChatService_types'),
+    Q = require('q');
 
 var options = nconf.get('PERSISTENCE').options;
-
-//lm sort out error handling so it doesn't crash the process
 
 /* Schema */
 
@@ -50,24 +49,9 @@ var chatSchema = new mongoose.Schema({
 var User = mongoose.model('User', userSchema);
 var Chat = mongoose.model('Chat', chatSchema);
 
-/* Error handling */
-
-// //lm sort this out
-// mongoose.connection.on('error', function(err) {
-//   console.log('here here');
-//   console.log(err);
-// });
-// User.on('error', function(err) {
-//   console.log('userwoops');
-//   console.log(err);
-// });
-// Chat.on('error', function(err) {
-//   console.log('chatwoops');
-//   console.log(err);
-// });
-
 /* Connect */
 
+//lm add auto reconnecting logic
 mongoose.connect(options.url);
 
 /* Main logic */
@@ -79,7 +63,7 @@ var P = function() {
     return candidate;
   };
 
-  this.lazyChat = function(chatId, ownerId, chatOptions, callback) {
+  this.lazyChat = function(chatId, ownerId, chatOptions) {
     GB.requiredArguments(ownerId);
 
     chatOptions = GB.optional(chatOptions, {});
@@ -105,25 +89,23 @@ var P = function() {
     if (_.size(setOnInsertObject) > 0) updateObject.$setOnInsert = setOnInsertObject;
     if (_.size(setObject) > 0) updateObject.$set = setObject;
 
-    Chat
+    return Chat
       .update({
         mId: chatId
       }, updateObject, {
         upsert: true,
       })
       .exec()
-      .then(function(chat) {
-        GB.callCallback(callback, chatId);
-      })
-      .end();
+      .then(function() {
+        return chatId;
+      });
   };
 
-  this.verifyUser = function(userId, callback) {
-    p.isUserIdRegistered(userId, function(isUserIdRegistered) {
-      if (!isUserIdRegistered) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
-
-      GB.callCallback(callback);
-    });
+  this.verifyUser = function(userId) {
+    return p.isUserIdRegistered(userId)
+      .then(function(isUserIdRegistered) {
+        if (!isUserIdRegistered) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
+      });
   };
   
   this.sliceForRangeMongo_s = function(range) {
@@ -144,10 +126,10 @@ var P = function() {
     return {skip: skip, limit: limit};
   };
 
-  this.isUserIdRegistered = function(userId, callback) {
+  this.isUserIdRegistered = function(userId) {
     GB.requiredArguments(userId);
 
-    User
+    return User
       .count({
         mId: userId
       })
@@ -155,105 +137,82 @@ var P = function() {
       .then(function(count) {
         var isUserIdRegistered = (count >= 1);
 
-        GB.callCallback(callback, isUserIdRegistered);
-      })
-      .end();
-  };
-
-  this.getChatStats = function(userId, chatId, callback) {
-    GB.requiredArguments(userId, chatId);
-    p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(chatId) {
-        Chat
-          .aggregate()
-          .match({
-            mId: chatId
-          })
-          .group({ 
-            _id: {
-              mId: '$mId',
-              messageCount: '$messageCount',
-            },
-              participantCount: { $sum: { $size: '$participantIds' } },
-          })
-          .project({
-            mId: '$_id.mId',
-            messageCount: '$_id.messageCount',
-            participantCount: '$participantCount',
-          })
-          .exec()
-          .then(function(results) {
-            var processedChat = _.find(results, function(result) {
-              return (result._id.mId === chatId);
-            });
-
-            var stats = new ttypes.ChatStats({
-              messageCount: processedChat.messageCount,
-              participantCount: processedChat.participantCount,
-            });
-
-            GB.callCallback(callback, stats);
-          })
-          .end();
+        return isUserIdRegistered;
       });
-    });
   };
 
-  this.getChatMeta = function(userId, chatId, callback) {
+  this.getChatStats = function(userId, chatId) {
     GB.requiredArguments(userId, chatId);
+    return p.verifyUser(userId)
+      .then(function() {
+        return p.lazyChat(chatId, userId)
+          .then(function(chatId) {
+            return Chat
+              .aggregate()
+              .match({
+                mId: chatId
+              })
+              .group({ 
+                _id: {
+                  mId: '$mId',
+                  messageCount: '$messageCount',
+                },
+                  participantCount: { $sum: { $size: '$participantIds' } },
+              })
+              .project({
+                mId: '$_id.mId',
+                messageCount: '$_id.messageCount',
+                participantCount: '$participantCount',
+              })
+              .exec()
+              .then(function(results) {
+                var processedChat = _.find(results, function(result) {
+                  return (result._id.mId === chatId);
+                });
 
-    p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(chatId) {
-        Chat
-          .findOne({
-            mId: chatId
-          })
-          .select('meta')
-          .exec()
-          .then(function(rawChat){
-            var meta = new ttypes.ChatMeta({
-              ownerId: rawChat.meta.ownerId,
-              dateCreated: rawChat.meta.dateCreated,
-              name: rawChat.meta.name,
-              topic: rawChat.meta.topic
-            });
+                var stats = new ttypes.ChatStats({
+                  messageCount: processedChat.messageCount,
+                  participantCount: processedChat.participantCount,
+                });
 
-            GB.callCallback(callback, meta);
-          })
-          .end();
-      });
-    });
-  };
-
-  this.setChatOptions = function(userId, chatId, chatOptions, callback) {
-    GB.requiredArguments(userId);
-
-    p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, chatOptions, function(chatId) {
-        p.getChatStats(userId, chatId, function(stats) {
-          p.getChatMeta(userId, chatId, function(meta) {
-            var chat = new ttypes.Chat({
-              id: chatId,
-              meta: meta,
-              stats: stats,
-            });
-
-            GB.callCallback(callback, chat);
+                return stats;
+              });
           });
-        });
       });
-    });
+  };
+
+  this.getChatMeta = function(userId, chatId) {
+    GB.requiredArguments(userId, chatId);
+
+    return p.verifyUser(userId)
+      .then(function() {
+        return p.lazyChat(chatId, userId)
+          .then(function(chatId) {
+            return Chat
+              .findOne({
+                mId: chatId
+              })
+              .select('meta')
+              .exec()
+              .then(function(rawChat){
+                var meta = new ttypes.ChatMeta({
+                  ownerId: rawChat.meta.ownerId,
+                  dateCreated: rawChat.meta.dateCreated,
+                  name: rawChat.meta.name,
+                  topic: rawChat.meta.topic
+                });
+
+                return meta;
+              });
+          });
+      });
   };
 
 };
 var p = new P();
 
-var inMemoryPersistence = module.exports = {
-  setHashingFunction: function(handler, callback) {
-    //lm kill this method
-    GB.callCallback(callback);
-  },
-  isUsernameAvailable: function(username, callback) {
+var InMemoryPersistence = function() {
+  this.isUsernameAvailable = function(username, callback) {
     GB.requiredArguments(username);
 
     User
@@ -264,11 +223,12 @@ var inMemoryPersistence = module.exports = {
       .then(function(count) {
         var isUsernameAvailable = (count === 0);
 
-        GB.callCallback(callback, isUsernameAvailable);
+        GB.callCallback(callback, null, isUsernameAvailable);
       })
-      .end();
-  },
-  setUser: function(userId, username, callback) {
+      .end(callback);
+  };
+
+  this.setUser = function(userId, username, callback) {
     GB.requiredArguments(username);
 
     // lazy creation of userId
@@ -286,15 +246,12 @@ var inMemoryPersistence = module.exports = {
       })
       .exec()
       .then(function() {
-        GB.callCallback(callback, userId);
+        GB.callCallback(callback, null, userId);
       })
-      .then(undefined, function(err) {
-        console.log('err');
-        console.log(err);
-      })
-      .end();
-  },
-  getUsername: function(userId, callback) {
+      .end(callback);
+  };
+  
+  this.getUsername = function(userId, callback) {
     GB.requiredArguments(userId);
 
     User
@@ -305,28 +262,68 @@ var inMemoryPersistence = module.exports = {
       .then(function(user) {
         var username = user ? user.username : null;
 
-        GB.callCallback(callback, username);
+        GB.callCallback(callback, null, username);
       })
-      .end();
-  },
-  getUserCount: function(callback) {
+      .end(callback);
+  };
+
+  this.getUserCount = function(callback) {
     User
       .count()
       .exec()
       .then(function(count) {
-        GB.callCallback(callback, count);
+        GB.callCallback(callback, null, count);
       })
-      .end();
-  },
-  getChatStats: p.getChatStats,// abstracted into private to avoid code repetition
-  getChatMeta: p.getChatMeta,// abstracted into private to avoid code repetition
-  setChatOptions: p.setChatOptions,// abstracted into private to avoid code repetition
-  getChat: function(userId, chatId, callback) {
+      .end(callback);
+  };
+
+  this.getChatStats = function(userId, chatId, callback) {
+    p.getChatStats(userId, chatId)
+      .then(function(stats) {
+        GB.callCallback(callback, null, stats);
+      })
+      .end(callback);
+  };
+
+  this.getChatMeta = function(userId, chatId, callback) {
+    p.getChatMeta(userId, chatId)
+      .then(function(meta) {
+        GB.callCallback(callback, null, meta);
+      })
+      .end(callback);
+  };
+
+  this.setChatOptions = function(userId, chatId, chatOptions, callback) {
     GB.requiredArguments(userId);
 
-    p.setChatOptions(userId, chatId, undefined, callback);
-  },
-  getChats: function(sorting, range, callback) {
+
+    p.verifyUser(userId)
+      .then(function() {
+
+        return p.lazyChat(chatId, userId, chatOptions)
+          .then(function(chatId) {
+            return Q.all([p.getChatStats(userId, chatId), p.getChatMeta(userId, chatId)])
+              .spread(function(stats, meta) {
+                var chat = new ttypes.Chat({
+                  id: chatId,
+                  meta: meta,
+                  stats: stats,
+                });
+
+                GB.callCallback(callback, null, chat);
+              });
+          });
+      })
+      .end(callback);
+  };
+
+  this.getChat = function(userId, chatId, callback) {
+    GB.requiredArguments(userId);
+
+    inMemoryPersistence.setChatOptions(userId, chatId, undefined, callback);
+  };
+
+  this.getChats = function(sorting, range, callback) {
     GB.requiredArguments(sorting, range);
 
     // convert the range into something Mongo understands
@@ -392,109 +389,109 @@ var inMemoryPersistence = module.exports = {
           });
         });
 
-        GB.callCallback(callback, chats);
+        GB.callCallback(callback, null, chats);
       })
-      .then(undefined, function(err) {
-        console.log('err');
-        console.log(err);
-      })
-      .end();
-  },
-  newMessage: function(userId, chatId, content, callback) {
+      .end(callback);
+  };
+
+  this.newMessage = function(userId, chatId, content, callback) {
     GB.requiredArguments(userId, chatId, content);
 
-    p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(chatId) {
+    p.verifyUser(userId)
+      .then(function() {
+        return p.lazyChat(chatId, userId)
+          .then(function(chatId) {
 
-      var rawMessage = {
-        authorId: userId,
-        dateCreated: GB.getCurrentISODate(),
-        content: content,
-      };
+            var rawMessage = {
+              authorId: userId,
+              dateCreated: GB.getCurrentISODate(),
+              content: content,
+            };
 
-      Chat
-        .update({
-          mId: chatId
-        }, {
-          // insert message
-          $push: {
-            messages: rawMessage,
-          },
-          // increment messageCount
-          $inc: {
-            'messageCount': 1
-          },
-          // insert participantIds
-          $addToSet: {
-            participantIds: userId,
-          },
-        })
-        .exec()
-        .then(function() {
-          GB.callCallback(callback);
-        })
-        .then(undefined, function(err) {
-          console.log('err');
-          console.log(err);
-        })
-        .end();
-      });  
-    });
-  },
-  getMessages: function(userId, chatId, range, callback) {
+            return Chat
+              .update({
+                mId: chatId
+              }, {
+                // insert message
+                $push: {
+                  messages: rawMessage,
+                },
+                // increment messageCount
+                $inc: {
+                  'messageCount': 1
+                },
+                // insert participantIds
+                $addToSet: {
+                  participantIds: userId,
+                },
+              })
+              .exec()
+              .then(function() {
+                GB.callCallback(callback, null);
+              });
+          });
+      })
+      .end(callback);
+  };
+
+  this.getMessages = function(userId, chatId, range, callback) {
     GB.requiredArguments(userId, chatId, range);
 
-    p.verifyUser(userId, function() {
-      p.lazyChat(chatId, userId, undefined, function(chatId) {
-        // convert the range into something JS understands
-        var slice = p.sliceForRangeMongo_s(range);
+    p.verifyUser(userId)
+      .then(function() {
+        return p.lazyChat(chatId, userId)
+          .then(function(chatId) {
+            // convert the range into something JS understands
+            var slice = p.sliceForRangeMongo_s(range);
 
-        Chat
-          .findOne({
-            mId: chatId
-          })
-          .where('messages').slice([slice.skip, slice.limit])
-          .select('messages messageCount')
-          .exec()
-          .then(function(rawChat) {
-            // get author names
-            var authorIds = _.uniq(_.map(rawChat.messages, function (rawMessage) {
-              return rawMessage.authorId;
-            }));
-
-            User
-              .where('mId').in(authorIds)
-              .exec()
-              .then(function(users) {
-                // create mapping of userIds to usernames
-                var usernameMap = {};
-                users.forEach(function(user) {
-                  usernameMap[user.mId] = user.username;
-                });
-
-                // convert raw messages into Message objects
-                var messages = _.map(rawChat.messages, function(rawMessage, index) {
-                  // process the tricky fields
-                  var seq = ((range.direction === ttypes.RangeDirection.FORWARDS) ? 0 : rawChat.messageCount - 1) + slice.skip + index;
-                  var authorName = usernameMap[rawMessage.authorId];
-
-                  return new ttypes.Message({
-                    seq:  seq,
-                    dateCreated: rawMessage.dateCreated,
-                    authorName: authorName,
-                    content: rawMessage.content,
-                  });
-                });
-
-                // potentially reverse the messages
-                if (range.direction === ttypes.RangeDirection.BACKWARDS) messages.reverse();
-
-                GB.callCallback(callback, messages);
+            return Chat
+              .findOne({
+                mId: chatId
               })
-              .end();
-          })
-          .end();
-      });
-    });
-  }
+              .where('messages').slice([slice.skip, slice.limit])
+              .select('messages messageCount')
+              .exec()
+              .then(function(rawChat) {
+                // get author names
+                var authorIds = _.uniq(_.map(rawChat.messages, function (rawMessage) {
+                  return rawMessage.authorId;
+                }));
+
+                return User
+                  .where('mId').in(authorIds)
+                  .exec()
+                  .then(function(users) {
+
+                    // create mapping of userIds to usernames
+                    var usernameMap = {};
+                    users.forEach(function(user) {
+                      usernameMap[user.mId] = user.username;
+                    });
+
+
+                    // convert raw messages into Message objects
+                    var messages = _.map(rawChat.messages, function(rawMessage, index) {
+                      // process the tricky fields
+                      var seq = ((range.direction === ttypes.RangeDirection.FORWARDS) ? 0 : rawChat.messageCount - 1) + slice.skip + index;
+                      var authorName = usernameMap[rawMessage.authorId];
+
+                      return new ttypes.Message({
+                        seq:  seq,
+                        dateCreated: rawMessage.dateCreated,
+                        authorName: authorName,
+                        content: rawMessage.content,
+                      });
+                    });
+
+                    // potentially reverse the messages
+                    if (range.direction === ttypes.RangeDirection.BACKWARDS) messages.reverse();
+
+                    GB.callCallback(callback, null, messages);
+                  });
+              });
+          });
+      })
+      .end(callback);
+  };
 };
+var inMemoryPersistence = module.exports = new InMemoryPersistence();
