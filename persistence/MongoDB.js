@@ -9,10 +9,10 @@
 var _ = require('underscore'),
     nconf = require('nconf'),
     mongoose = require('mongoose'),
-    GB = require('../lib/Goonbee/toolbox'),
-    errors = require('../lib/Chat/errors'),//lm sort out this require, it's nasty
-    ttypes = require('../gen-nodejs/GoonbeeChatService_types'),
-    Q = require('q');
+    toolbox = require('gb-toolbox'),
+    api = require('gb-api'),
+    Q = require('q'),
+    ttypes = require('../gen-nodejs/GoonbeeChatService_types');
 
 var options = nconf.get('PERSISTENCE').options;
 
@@ -71,12 +71,12 @@ var P = function() {
   };
 
   this.lazyChat = function(chatId, ownerId, chatOptions) {
-    GB.requiredArguments(ownerId);
+    toolbox.requiredArguments(ownerId);
 
-    chatOptions = GB.optional(chatOptions, {});
+    chatOptions = toolbox.optional(chatOptions, {});
     
     // make sure we have a valid chatId
-    chatId = GB.optional(chatId, p.autoId_s());
+    chatId = toolbox.optional(chatId, p.autoId_s());
 
     // what we will set on object creation
     var setOnInsertObject = {};
@@ -84,7 +84,7 @@ var P = function() {
     setOnInsertObject.messages = [];
     setOnInsertObject.messageCount = 0;
     setOnInsertObject['meta.ownerId'] = ownerId;
-    setOnInsertObject['meta.dateCreated'] = GB.getCurrentISODate();
+    setOnInsertObject['meta.dateCreated'] = toolbox.getCurrentISODate();
     if (_.isUndefined(chatOptions.name)) setOnInsertObject['meta.name'] = nconf.get('DEFAULT_CHAT_NAME');
 
     // some optional customisation that we do each time
@@ -111,7 +111,7 @@ var P = function() {
   this.verifyUser = function(userId) {
     return p.isUserIdRegistered(userId)
       .then(function(isUserIdRegistered) {
-        if (!isUserIdRegistered) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
+        if (!isUserIdRegistered) throw new api.errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
       });
   };
   
@@ -134,7 +134,7 @@ var P = function() {
   };
 
   this.isUserIdRegistered = function(userId) {
-    GB.requiredArguments(userId);
+    toolbox.requiredArguments(userId);
 
     return User
       .count({
@@ -149,7 +149,7 @@ var P = function() {
   };
 
   this.getChatStats = function(userId, chatId) {
-    GB.requiredArguments(userId, chatId);
+    toolbox.requiredArguments(userId, chatId);
     return p.verifyUser(userId)
       .then(function() {
         return p.lazyChat(chatId, userId)
@@ -189,7 +189,7 @@ var P = function() {
   };
 
   this.getChatMeta = function(userId, chatId) {
-    GB.requiredArguments(userId, chatId);
+    toolbox.requiredArguments(userId, chatId);
 
     return p.verifyUser(userId)
       .then(function() {
@@ -220,7 +220,7 @@ var p = new P();
 
 var InMemoryPersistence = function() {
   this.isUsernameAvailable = function(username, callback) {
-    GB.requiredArguments(username);
+    toolbox.requiredArguments(username);
 
     User
       .count({
@@ -230,16 +230,16 @@ var InMemoryPersistence = function() {
       .then(function(count) {
         var isUsernameAvailable = (count === 0);
 
-        GB.callCallback(callback, null, isUsernameAvailable);
+        toolbox.callCallback(callback, null, isUsernameAvailable);
       })
       .end(callback);
   };
 
   this.setUser = function(userId, username, callback) {
-    GB.requiredArguments(username);
+    toolbox.requiredArguments(username);
 
     // lazy creation of userId
-    userId = GB.optional(userId, p.autoId_s());
+    userId = toolbox.optional(userId, p.autoId_s());
     // ...and therewith user
     User
       .update({
@@ -253,13 +253,13 @@ var InMemoryPersistence = function() {
       })
       .exec()
       .then(function() {
-        GB.callCallback(callback, null, userId);
+        toolbox.callCallback(callback, null, userId);
       })
       .end(callback);
   };
   
   this.getUsername = function(userId, callback) {
-    GB.requiredArguments(userId);
+    toolbox.requiredArguments(userId);
 
     User
       .findOne({
@@ -269,7 +269,7 @@ var InMemoryPersistence = function() {
       .then(function(user) {
         var username = user ? user.username : null;
 
-        GB.callCallback(callback, null, username);
+        toolbox.callCallback(callback, null, username);
       })
       .end(callback);
   };
@@ -279,7 +279,7 @@ var InMemoryPersistence = function() {
       .count()
       .exec()
       .then(function(count) {
-        GB.callCallback(callback, null, count);
+        toolbox.callCallback(callback, null, count);
       })
       .end(callback);
   };
@@ -287,7 +287,7 @@ var InMemoryPersistence = function() {
   this.getChatStats = function(userId, chatId, callback) {
     p.getChatStats(userId, chatId)
       .then(function(stats) {
-        GB.callCallback(callback, null, stats);
+        toolbox.callCallback(callback, null, stats);
       })
       .end(callback);
   };
@@ -295,13 +295,13 @@ var InMemoryPersistence = function() {
   this.getChatMeta = function(userId, chatId, callback) {
     p.getChatMeta(userId, chatId)
       .then(function(meta) {
-        GB.callCallback(callback, null, meta);
+        toolbox.callCallback(callback, null, meta);
       })
       .end(callback);
   };
 
   this.setChatOptions = function(userId, chatId, chatOptions, callback) {
-    GB.requiredArguments(userId);
+    toolbox.requiredArguments(userId);
 
 
     p.verifyUser(userId)
@@ -317,7 +317,7 @@ var InMemoryPersistence = function() {
                   stats: stats,
                 });
 
-                GB.callCallback(callback, null, chat);
+                toolbox.callCallback(callback, null, chat);
               });
           });
       })
@@ -325,13 +325,13 @@ var InMemoryPersistence = function() {
   };
 
   this.getChat = function(userId, chatId, callback) {
-    GB.requiredArguments(userId);
+    toolbox.requiredArguments(userId);
 
     inMemoryPersistence.setChatOptions(userId, chatId, undefined, callback);
   };
 
   this.getChats = function(sorting, range, callback) {
-    GB.requiredArguments(sorting, range);
+    toolbox.requiredArguments(sorting, range);
 
     // convert the range into something Mongo understands
     slice = p.sliceForRangeMongo_s(range);
@@ -396,13 +396,13 @@ var InMemoryPersistence = function() {
           });
         });
 
-        GB.callCallback(callback, null, chats);
+        toolbox.callCallback(callback, null, chats);
       })
       .end(callback);
   };
 
   this.newMessage = function(userId, chatId, content, callback) {
-    GB.requiredArguments(userId, chatId, content);
+    toolbox.requiredArguments(userId, chatId, content);
 
     p.verifyUser(userId)
       .then(function() {
@@ -411,7 +411,7 @@ var InMemoryPersistence = function() {
 
             var rawMessage = {
               authorId: userId,
-              dateCreated: GB.getCurrentISODate(),
+              dateCreated: toolbox.getCurrentISODate(),
               content: content,
             };
 
@@ -434,7 +434,7 @@ var InMemoryPersistence = function() {
               })
               .exec()
               .then(function() {
-                GB.callCallback(callback, null);
+                toolbox.callCallback(callback, null);
               });
           });
       })
@@ -442,7 +442,7 @@ var InMemoryPersistence = function() {
   };
 
   this.getMessages = function(userId, chatId, range, callback) {
-    GB.requiredArguments(userId, chatId, range);
+    toolbox.requiredArguments(userId, chatId, range);
 
     p.verifyUser(userId)
       .then(function() {
@@ -493,7 +493,7 @@ var InMemoryPersistence = function() {
                     // potentially reverse the messages
                     if (range.direction === ttypes.RangeDirection.BACKWARDS) messages.reverse();
 
-                    GB.callCallback(callback, null, messages);
+                    toolbox.callCallback(callback, null, messages);
                   });
               });
           });

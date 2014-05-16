@@ -9,8 +9,8 @@
 var crypto = require('crypto'),
     _ = require('underscore'),
     nconf = require('nconf'),
-    GB = require('../lib/Goonbee/toolbox'),
-    errors = require('../lib/Chat/errors'),//lm sort out this require, it's nasty
+    toolbox = require('gb-toolbox'),
+    api = require('gb-api'),
     ttypes = require('../gen-nodejs/GoonbeeChatService_types');
 
 var options = nconf.get('PERSISTENCE').options;
@@ -32,9 +32,9 @@ var P = function() {
   };
 
   this.autoId_s = function(field, prefix, offset) {
-    GB.requiredArguments(field);
-    GB.requiredVariables(p.hashingFunction);
-    offset = GB.optional(offset, 0);
+    toolbox.requiredArguments(field);
+    toolbox.requiredVariables(p.hashingFunction);
+    offset = toolbox.optional(offset, 0);
 
     var itemCount = _.size(field) + offset;
     var candidate = p.hashingFunction(prefix + itemCount.toString());
@@ -47,23 +47,23 @@ var P = function() {
   };
 
   this.lazyChat = function(chatId, ownerId, chatOptions, callback) {
-    GB.requiredArguments(ownerId);
-    chatOptions = GB.optional(chatOptions, {});
+    toolbox.requiredArguments(ownerId);
+    chatOptions = toolbox.optional(chatOptions, {});
     
     // attempt to get existing chat
     var rawChat = storage.chats[chatId];
 
     if (_.isUndefined(rawChat)) {
       // generate id for it if necessary
-      chatId = GB.optional(chatId, p.autoId_s(storage.chats, 'chat'));
+      chatId = toolbox.optional(chatId, p.autoId_s(storage.chats, 'chat'));
 
       // initialize it
       rawChat = {
         meta: {
           ownerId: ownerId,
-          dateCreated: GB.getCurrentISODate(),
-          name: GB.optional(chatOptions.name, nconf.get('DEFAULT_CHAT_NAME')),
-          topic: GB.optional(chatOptions.topic, null),
+          dateCreated: toolbox.getCurrentISODate(),
+          name: toolbox.optional(chatOptions.name, nconf.get('DEFAULT_CHAT_NAME')),
+          topic: toolbox.optional(chatOptions.topic, null),
         },
         participants: [],
         messages: []
@@ -77,22 +77,22 @@ var P = function() {
     if (!_.isUndefined(chatOptions.name)) rawChat.meta.name = chatOptions.name;
     if (!_.isUndefined(chatOptions.topic)) rawChat.meta.topic = chatOptions.topic;
 
-    GB.callCallback(callback, chatId);
+    toolbox.callCallback(callback, chatId);
   };
 
   this.verifyUser = function(userId, callback) {
     p.isUserIdRegistered(userId, function(isUserIdRegistered) {
-      if (!isUserIdRegistered) throw new errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
+      if (!isUserIdRegistered) throw new api.errors.errorTypes.AuthenticationError('The user "' + userId + '" does not exist');
 
-      GB.callCallback(callback);
+      toolbox.callCallback(callback);
     });
   };
   
   this.sliceForRange_s = function(collection, range) {
     var elementCount = _.size(collection);
     
-    var saneIndex = GB.threshold(range.index, 0, elementCount);
-    var saneLength = GB.threshold(range.length, 0, elementCount - saneIndex);
+    var saneIndex = toolbox.threshold(range.index, 0, elementCount);
+    var saneLength = toolbox.threshold(range.length, 0, elementCount - saneIndex);
 
     var begin;
     var end;
@@ -112,13 +112,13 @@ var P = function() {
   };
 
   this.isUserIdRegistered = function(userId, callback) {
-    GB.requiredArguments(userId);
+    toolbox.requiredArguments(userId);
 
-    GB.callCallback(callback, _.has(storage.users, userId));
+    toolbox.callCallback(callback, _.has(storage.users, userId));
   };
 
   this.getChatStats = function(userId, chatId, callback) {
-    GB.requiredArguments(userId, chatId);
+    toolbox.requiredArguments(userId, chatId);
 
     p.verifyUser(userId, function() {
       p.lazyChat(chatId, userId, undefined, function(chatId) {
@@ -129,13 +129,13 @@ var P = function() {
           participantCount: _.size(storedChat.participants),
         });
 
-        GB.callCallback(callback, stats);
+        toolbox.callCallback(callback, stats);
       });
     });
   };
 
   this.getChatMeta = function(userId, chatId, callback) {
-    GB.requiredArguments(userId, chatId);
+    toolbox.requiredArguments(userId, chatId);
 
     p.verifyUser(userId, function() {
       p.lazyChat(chatId, userId, undefined, function(chatId) {
@@ -148,13 +148,13 @@ var P = function() {
           topic: storedChat.meta.topic,
         });
 
-        GB.callCallback(callback, meta);
+        toolbox.callCallback(callback, meta);
       });
     });
   };
 
   this.setChatOptions = function(userId, chatId, chatOptions, callback) {
-    GB.requiredArguments(userId);
+    toolbox.requiredArguments(userId);
 
     p.verifyUser(userId, function() {
       p.lazyChat(chatId, userId, chatOptions, function(chatId) {
@@ -166,7 +166,7 @@ var P = function() {
               stats: stats,
             });
 
-            GB.callCallback(callback, chat);
+            toolbox.callCallback(callback, chat);
           });
         });
       });
@@ -178,42 +178,42 @@ var p = new P();
 
 var inMemoryPersistence = module.exports = {
   isUsernameAvailable: function(username, callback) {
-    GB.requiredArguments(username);
+    toolbox.requiredArguments(username);
 
     var isUsernameAvailable = !_.contains(storage.users, username);
 
-    GB.callCallback(callback, isUsernameAvailable);
+    toolbox.callCallback(callback, isUsernameAvailable);
   },
   setUser: function(userId, username, callback) {
-    GB.requiredArguments(username);
+    toolbox.requiredArguments(username);
 
     // lazy creation of userId
-    userId = GB.optional(userId, p.autoId_s(storage.users, 'user'));
+    userId = toolbox.optional(userId, p.autoId_s(storage.users, 'user'));
     // ...and therewith user
     storage.users[userId] = username;  
 
-    GB.callCallback(callback, userId);
+    toolbox.callCallback(callback, userId);
   },
   getUsername: function(userId, callback) {
-    GB.requiredArguments(userId);
+    toolbox.requiredArguments(userId);
 
     p.verifyUser(userId, function() {
-      GB.callCallback(callback, storage.users[userId]);      
+      toolbox.callCallback(callback, storage.users[userId]);      
     });
   },
   getUserCount: function(callback) {
-    GB.callCallback(callback, _.size(storage.users));
+    toolbox.callCallback(callback, _.size(storage.users));
   },
   getChatStats: p.getChatStats,// abstracted into private to avoid code repetition
   getChatMeta: p.getChatMeta,// abstracted into private to avoid code repetition
   setChatOptions: p.setChatOptions,// abstracted into private to avoid code repetition
   getChat: function(userId, chatId, callback) {
-    GB.requiredArguments(userId);
+    toolbox.requiredArguments(userId);
 
     p.setChatOptions(userId, chatId, undefined, callback);
   },
   getChats: function(sorting, range, callback) {
-    GB.requiredArguments(sorting, range);
+    toolbox.requiredArguments(sorting, range);
 
     // prune the raw chat first to get only what we want out, we do it now because the elements will be copied and this saves memory
     var chats = _.map(storage.chats, function(representationalChat, chatId) {
@@ -259,17 +259,17 @@ var inMemoryPersistence = module.exports = {
     if (range.direction === ttypes.RangeDirection.BACKWARDS) chats.reverse();
 
     //return chats, they're already in the correct format
-    GB.callCallback(callback, chats);
+    toolbox.callCallback(callback, chats);
   },
   newMessage: function(userId, chatId, content, callback) {
-    GB.requiredArguments(userId, chatId, content);
+    toolbox.requiredArguments(userId, chatId, content);
 
     p.verifyUser(userId, function() {
       p.lazyChat(chatId, userId, undefined, function(chatId) {
         var storedChat = storage.chats[chatId];
 
         var rawMessage = {
-          dateCreated: GB.getCurrentISODate(),
+          dateCreated: toolbox.getCurrentISODate(),
           authorId: userId,
           content: content,
         };
@@ -279,12 +279,12 @@ var inMemoryPersistence = module.exports = {
         // insert participant
         if (!_.contains(storedChat.participants, userId)) storedChat.participants.push(userId);
 
-        GB.callCallback(callback);
+        toolbox.callCallback(callback);
       });  
     });
   },
   getMessages: function(userId, chatId, range, callback) {
-    GB.requiredArguments(userId, chatId, range);
+    toolbox.requiredArguments(userId, chatId, range);
 
     p.verifyUser(userId, function() {
       p.lazyChat(chatId, userId, undefined, function(chatId) {
@@ -312,7 +312,7 @@ var inMemoryPersistence = module.exports = {
         // potentially reverse the messages
         if (range.direction === ttypes.RangeDirection.BACKWARDS) messages.reverse();
 
-        GB.callCallback(callback, messages);
+        toolbox.callCallback(callback, messages);
       });
     });
   }
