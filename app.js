@@ -10,8 +10,8 @@
 
 var nconf = require('nconf'),
     api = require('gb-api'),
-    GBChatService = require('./gen-nodejs/GoonbeeChatService'),
-    ttypes = require('./gen-nodejs/GoonbeeChatService_types');
+    GBChatService = require('./thrift/gen-nodejs/GoonbeeChatService'),
+    ttypes = require('./thrift/gen-nodejs/GoonbeeChatService_types');
 
 // Config
 nconf.argv()
@@ -36,7 +36,7 @@ api.errors.setErrorMapper(function(e) {
 });
 
 // Persistence layer
-var persistence = require('./persistence/' + nconf.get('PERSISTENCE').type);
+var persistence = require('./lib/persistence/' + nconf.get('PERSISTENCE').type);
 
 // Server implementation
 var Service = function() {
