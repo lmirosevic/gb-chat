@@ -4,6 +4,7 @@
 		"type": "MongoDB",
 		"options": { 
 			"url": "mongodb://localhost:27017/chat",
+			"collectionNamespace": "chat",
 			"reconnectionTimeout": 1000,
 			"idHashingEnabled": true,
 			"hashingSalt": "magic"

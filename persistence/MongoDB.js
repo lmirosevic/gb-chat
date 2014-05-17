@@ -46,8 +46,8 @@ var chatSchema = new mongoose.Schema({
 
 /* Models */
 
-var User = mongoose.model('User', userSchema);
-var Chat = mongoose.model('Chat', chatSchema);
+var User = mongoose.model(options.collectionNamespace + '.' + 'User', userSchema);
+var Chat = mongoose.model(options.collectionNamespace + '.' + 'Chat', chatSchema);
 
 /* Connect */
 
