@@ -1,5 +1,4 @@
-gb-chat
-============
+# gb-chat ![License](https://img.shields.io/badge/license-Apache_2-green.svg?style=flat)
 
 Goonbee's realtime chat service for node.js, with pluggable backends. Comes with InMemory and MongoDB persistence layers OOB.
 
