@@ -182,7 +182,7 @@ var inMemoryPersistence = module.exports = {
 
     var isUsernameAvailable = !_.contains(storage.users, username);
 
-    toolbox.callCallback(callback, isUsernameAvailable);
+    toolbox.callCallback(callback, null, isUsernameAvailable);
   },
   setUser: function(userId, username, callback) {
     toolbox.requiredArguments(username);
@@ -192,25 +192,39 @@ var inMemoryPersistence = module.exports = {
     // ...and therewith user
     storage.users[userId] = username;  
 
-    toolbox.callCallback(callback, userId);
+    toolbox.callCallback(callback, null, userId);
   },
   getUsername: function(userId, callback) {
     toolbox.requiredArguments(userId);
 
     p.verifyUser(userId, function() {
-      toolbox.callCallback(callback, storage.users[userId]);      
+      toolbox.callCallback(callback, null, storage.users[userId]);      
     });
   },
   getUserCount: function(callback) {
-    toolbox.callCallback(callback, _.size(storage.users));
+    toolbox.callCallback(callback, null, _.size(storage.users));
   },
-  getChatStats: p.getChatStats,// abstracted into private to avoid code repetition
-  getChatMeta: p.getChatMeta,// abstracted into private to avoid code repetition
-  setChatOptions: p.setChatOptions,// abstracted into private to avoid code repetition
+  getChatStats: function(userId, chatId, callback) {
+    p.getChatStats(userId, chatId, function(stats) {
+      toolbox.callCallback(callback, null, stats);
+    });
+  },
+  getChatMeta: function(userId, chatId, callback) {
+    p.getChatMeta(userId, chatId, function(meta) {
+      toolbox.callCallback(callback, null, meta);
+    });
+  },
+  setChatOptions: function(userId, chatId, chatOptions, callback) {
+    p.setChatOptions(userId, chatId, chatOptions, function(chat) {
+      toolbox.callCallback(callback, null, chat);
+    });
+  },
   getChat: function(userId, chatId, callback) {
     toolbox.requiredArguments(userId);
 
-    p.setChatOptions(userId, chatId, undefined, callback);
+    p.setChatOptions(userId, chatId, undefined, function(chat) {
+      toolbox.callCallback(callback, null, chat);
+    });
   },
   getChats: function(sorting, range, callback) {
     toolbox.requiredArguments(sorting, range);
@@ -259,7 +273,7 @@ var inMemoryPersistence = module.exports = {
     if (range.direction === ttypes.RangeDirection.BACKWARDS) chats.reverse();
 
     //return chats, they're already in the correct format
-    toolbox.callCallback(callback, chats);
+    toolbox.callCallback(callback, null, chats);
   },
   newMessage: function(userId, chatId, content, callback) {
     toolbox.requiredArguments(userId, chatId, content);
@@ -279,7 +293,7 @@ var inMemoryPersistence = module.exports = {
         // insert participant
         if (!_.contains(storedChat.participants, userId)) storedChat.participants.push(userId);
 
-        toolbox.callCallback(callback);
+        toolbox.callCallback(callback, null);
       });  
     });
   },
@@ -312,7 +326,7 @@ var inMemoryPersistence = module.exports = {
         // potentially reverse the messages
         if (range.direction === ttypes.RangeDirection.BACKWARDS) messages.reverse();
 
-        toolbox.callCallback(callback, messages);
+        toolbox.callCallback(callback, null, messages);
       });
     });
   }
