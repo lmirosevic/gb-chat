@@ -11,7 +11,8 @@
 var nconf = require('nconf'),
     api = require('gb-api'),
     GBChatService = require('./thrift/gen-nodejs/GoonbeeChatService'),
-    ttypes = require('./thrift/gen-nodejs/GoonbeeChatService_types');
+    ttypes = require('./thrift/gen-nodejs/GoonbeeChatService_types'),
+    ttypesShared = require('./thrift/gen-nodejs/GoonbeeShared_types');
 
 // Config
 nconf.argv()
@@ -23,17 +24,19 @@ api.errors.setShouldLogCalls(nconf.get('LOG_CALLS'));
 api.errors.setShouldLogErrors(nconf.get('LOG_ERRORS'));
 
 // Error mapping from application -> thrift
-api.errors.setErrorMapper(function(e) {
-  if (e instanceof api.errors.errorTypes.GenericError) {
-    return new ttypes.RequestError({status: ttypes.ResponseStatus.GENERIC, message: e.message});
-  }
-  else if (e instanceof api.errors.errorTypes.AuthenticationError) {
-    return new ttypes.RequestError({status: ttypes.ResponseStatus.AUTHENTICATION, message: e.message});
-  }
-  else {
-    return new ttypes.RequestError({status: ttypes.ResponseStatus.GENERIC, message: 'Unknown error occurred'}); 
-  }
-});
+api.errors.setErrorMapping(
+  {
+    GenericError: ttypesShared.ResponseStatus.GENERIC,
+    MalformedRequestError: ttypesShared.ResponseStatus.MALFORMED_REQUEST,
+    AuthenticationError: ttypesShared.ResponseStatus.AUTHENTICATION,
+    AuthorizationError: ttypesShared.ResponseStatus.AUTHORIZATION,
+    PhasedOutError: ttypesShared.ResponseStatus.PHASED_OUT,
+  },
+  function(status, message) {
+    return new ttypesShared.RequestError({status: status, message: message});// passes through original error message to client, this is desired in the case of the mapped errors above
+  },
+  new ttypesShared.RequestError({status: ttypesShared.ResponseStatus.GENERIC, message: 'A generic error occured.'})
+);
 
 // Persistence layer
 var persistence = require('./lib/persistence/' + nconf.get('PERSISTENCE').type);
@@ -41,7 +44,7 @@ var persistence = require('./lib/persistence/' + nconf.get('PERSISTENCE').type);
 // Server implementation
 var Service = function() {
   /** 
-   * Goonbee Shared Thrift Service 
+   * GoonbeeShared BaseService 
    */
 
   this.alive = function(result) {
@@ -60,7 +63,7 @@ var Service = function() {
     persistence.setUser(userId, username, result);
   };
 
-  this.setChatOptions = function(userId, chatId, chatOptions, result) {
+  this.setChatOptions = this.newChat = function(userId, chatId, chatOptions, result) {
     persistence.setChatOptions(userId, chatId, chatOptions, result);
   };
 
@@ -83,10 +86,8 @@ var Service = function() {
   this.globalUserCount = function(result) {
     persistence.getUserCount(result);
   };
-
-  this.newChat = this.setChatOptions;// the implementation is identical to setChatOptions so it's implemented as an alias
 };
 
 // Start server
 api.createThriftServer(GBChatService, new Service()).listen(nconf.get('PORT'));
-console.log("Server started on port " + nconf.get('PORT'));
+console.log("Chat server started on port " + nconf.get('PORT'));
