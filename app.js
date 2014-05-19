@@ -42,7 +42,7 @@ api.errors.setErrorMapping(
 var persistence = require('./lib/persistence/' + nconf.get('PERSISTENCE').type);
 
 // Server implementation
-var Service = function() {
+var ChatServiceImplementation = function() {
   /** 
    * GoonbeeShared BaseService 
    */
@@ -89,5 +89,5 @@ var Service = function() {
 };
 
 // Start server
-api.createThriftServer(GBChatService, new Service()).listen(nconf.get('PORT'));
+api.createThriftServer(GBChatService, new ChatServiceImplementation()).listen(nconf.get('PORT'));
 console.log("Chat server started on port " + nconf.get('PORT'));
