@@ -18,9 +18,7 @@ var resultLogger = function(err, result) {
   console.log('----------');
 };
 
-client.setChatOptions('nonsense', 'anychat', null, function(err, result) {
-  resultLogger.apply(this, arguments);
-});
+client.setChatOptions('nonsense', 'anychat', null, resultLogger);
 
 
 
