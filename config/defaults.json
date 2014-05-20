@@ -7,7 +7,8 @@
 			"collectionNamespace": "chat",
 			"reconnectionTimeout": 1000,
 			"idHashingEnabled": true,
-			"hashingSalt": "magic"
+			"hashingSalt": "magic",
+			"debug": false
 		}
 	},
 	"DEFAULT_CHAT_NAME": null,
