@@ -7,6 +7,7 @@
 //
 
 //lm might need to add a different message type like "status" to enable things like "luka change the room topic to 'blabla'"
+//lm add heartbeat oneway message
 
 var nconf = require('nconf'),
     api = require('gb-api'),
